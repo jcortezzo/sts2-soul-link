@@ -1,3 +1,4 @@
+using SoulLink.Core.Cards;
 using SoulLink.Core.Decisions;
 
 namespace SoulLink.Core.Tests;
@@ -27,4 +28,19 @@ internal static class TestOptions
             .ToArray();
 
     public static OptionKey Slot(int number) => OptionKey.Slot(number);
+}
+
+internal static class TestCards
+{
+    /// <summary>Card ids that show the owner: Ana's cards are 101, 102..., Ben's 201..., Cal's 301...</summary>
+    public static CardId Card(PlayerId owner, int number) => new((long)owner.Value * 100 + number);
+
+    public static CardRef Ref(PlayerId owner, int number) => new(owner, Card(owner, number));
+
+    public static CardId[] Deck(PlayerId owner, int count) =>
+        Enumerable.Range(1, count).Select(number => Card(owner, number)).ToArray();
+
+    /// <summary>A selection screen showing the owner's cards 1..count, all eligible.</summary>
+    public static SelectionScreen Screen(PlayerId owner, int count) =>
+        SelectionScreen.Of(owner, Deck(owner, count));
 }
