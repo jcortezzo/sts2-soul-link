@@ -4,7 +4,8 @@ A co-op mod for Slay the Spire 2 that links every out-of-combat decision between
 
 It's inspired by Pokémon Soul Link challenges and the [Slay the Soul-Link](https://docs.google.com/document/d/1XyDEOh4QqVfNqKOosRGrHEikjtB77w95TzjEURAe4lY/edit?tab=t.0) challenge by Rayditz and naturesbf.
 
-> **Status:** early development. Not on the Steam Workshop yet, and the name is a working title.
+> **Status:** early development. The rules engine and the host-ordered sync are done and tested; the in-game patches
+> for each decision screen are next. Not on the Steam Workshop yet, and the name is a working title.
 
 ## Rules
 
@@ -15,14 +16,23 @@ The full rules, settings and worked examples are in [docs/rules.md](docs/rules.m
 - **Card matching:** your "same card" is either the card linked to theirs (gained from the same choice) or the card at the same position.
 - **Shared death:** optional. When on, any player's death ends the run.
 
+The host picks these in BaseLib's mod config menu, and everyone in the run plays under the host's settings.
+
 ## Repository layout
 
 ```text
-src/SoulLink/               the mod (from Alchyr's BaseLib template): patches, networking, UI, manifest
-src/SoulLink.Core/          rules engine with no game references; compiled into the mod's DLL
-tests/SoulLink.Core.Tests/  xUnit tests for the rules engine
-docs/                       rules spec
+src/SoulLink/                  the mod (from Alchyr's BaseLib template): config, network messages, run session, patches
+src/SoulLink.Core/             rules engine with no game references; compiled into the mod's DLL
+  Decisions/                   first-click linked decisions with nice and mean modes
+  Cards/                       link groups, starter pairing, linked cards and deck index matching
+  Rewards/ Shops/ Campfires/   card reward screens, shop obligations, campfire categories
+  Sync/                        host-ordered operations, so every player sees the same locks
+tests/SoulLink.Core.Tests/     xUnit tests, including one per worked example in the rules spec
+docs/                          rules spec
 ```
+
+Every peer runs the same rules engine. Players send their choices to the host, which applies them in the order they
+arrive and broadcasts numbered notices that everyone replays, so the host decides who clicked first.
 
 ## Requirements
 
