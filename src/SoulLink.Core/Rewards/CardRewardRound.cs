@@ -88,8 +88,11 @@ public sealed class CardRewardScreen
 {
     private readonly Dictionary<PlayerId, RerollState> _rerolls = new();
 
-    internal CardRewardScreen(int number, LinkMode mode)
+    /// <param name="number">Which of each player's card rewards this is, counted from 1.</param>
+    /// <param name="mode">Nice or mean, from the settings.</param>
+    public CardRewardScreen(int number, LinkMode mode)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
         Number = number;
         Decision = new OptionDecision(mode);
     }
@@ -179,7 +182,8 @@ public sealed class CardRewardScreen
         return owing;
     }
 
-    internal void Join(PlayerId player, CardRewardOffer offer)
+    /// <summary>Adds a player who has this screen, with what it offers them.</summary>
+    public void Join(PlayerId player, CardRewardOffer offer)
     {
         ArgumentNullException.ThrowIfNull(offer);
         Decision.Join(player, offer.ToOptions());
