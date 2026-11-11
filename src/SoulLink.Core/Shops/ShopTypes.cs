@@ -81,6 +81,10 @@ public sealed record Obligation(PlayerId Debtor, ShopSlot Slot, int Price, Playe
 /// <summary>A completed purchase.</summary>
 /// <param name="Sequence">1-based order of purchases in this shop.</param>
 /// <param name="SettledObligation">True when the player was paying off an obligation, which binds no one.</param>
+/// <param name="Root">
+/// The sequence of the purchase that decided this one: the purchase that created the obligation, or this purchase.
+/// Cards bought with the same slot and root link together.
+/// </param>
 /// <param name="NewObligations">Purchases other players now owe.</param>
 public sealed record Purchase(
     int Sequence,
@@ -88,4 +92,5 @@ public sealed record Purchase(
     ShopSlot Slot,
     int Price,
     bool SettledObligation,
+    int Root,
     IReadOnlyList<Obligation> NewObligations);

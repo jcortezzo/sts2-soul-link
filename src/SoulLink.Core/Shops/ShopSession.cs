@@ -168,7 +168,7 @@ public sealed class ShopSession
             }
         }
 
-        var purchase = new Purchase(sequence, player, slot, item.Price, settled is not null, created);
+        var purchase = new Purchase(sequence, player, slot, item.Price, settled is not null, settled?.Sequence ?? sequence, created);
         _purchases.Add(purchase);
         return purchase;
     }
