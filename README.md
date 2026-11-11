@@ -1,0 +1,70 @@
+# Soul Link for Slay the Spire 2
+
+A co-op mod for Slay the Spire 2 that links every out-of-combat decision between players. The first player to choose sets the choice, and everyone who can make the same choice must. Combat, potions and the map stay free.
+
+It's inspired by Pokémon Soul Link challenges and the [Slay the Soul-Link](https://docs.google.com/document/d/1XyDEOh4QqVfNqKOosRGrHEikjtB77w95TzjEURAe4lY/edit?tab=t.0) challenge by Rayditz and naturesbf.
+
+> **Status:** early development. Not on the Steam Workshop yet, and the name is a working title.
+
+## Rules
+
+The full rules, settings and worked examples are in [docs/rules.md](docs/rules.md). In short:
+
+- **Linked:** card rewards, deck card choices (upgrade, remove, transform, enchant, duplicate), shop purchases, campfires, events, Ancients, relic rewards and chests.
+- **Nice or mean:** when a choice isn't possible for everyone, nice mode lets whoever can follow it, and mean mode greys it out for everyone.
+- **Card matching:** your "same card" is either the card linked to theirs (gained from the same choice) or the card at the same position.
+- **Shared death:** optional. When on, any player's death ends the run.
+
+## Repository layout
+
+```text
+src/SoulLink/               the mod (from Alchyr's BaseLib template): patches, networking, UI, manifest
+src/SoulLink.Core/          rules engine with no game references; compiled into the mod's DLL
+tests/SoulLink.Core.Tests/  xUnit tests for the rules engine
+docs/                       rules spec
+```
+
+## Requirements
+
+- Slay the Spire 2 on Steam
+- .NET SDK 9 or later
+- [BaseLib](https://github.com/Alchyr/BaseLib-StS2): subscribe on the Steam Workshop (ID 3737335127). The project pulls it in as the `Alchyr.Sts2.BaseLib` NuGet package.
+
+Godot isn't needed. The mod is code only, and Godot (MegaDot 4.5.1) is used only by `dotnet publish` to pack assets into a `.pck`.
+
+## Build
+
+Open `SoulLink.sln` in Rider or Visual Studio, or build the mod from the command line:
+
+```sh
+dotnet build src/SoulLink/SoulLink.csproj
+```
+
+The build finds the game through Steam, compiles against the game's `sts2.dll`, and copies `SoulLink.dll`, `SoulLink.json` and `SoulLink.pdb` into `<game>/mods/SoulLink/`. To use a different install, copy `src/SoulLink/Directory.Build.props.example` to `Directory.Build.props` (git-ignored) and set `Sts2Path`.
+
+## Test
+
+```sh
+dotnet test tests/SoulLink.Core.Tests/SoulLink.Core.Tests.csproj
+```
+
+The rules engine tests don't need the game, and CI runs them on every push. The mod project isn't built in CI because it needs the game's DLLs.
+
+To test co-op on one PC, start several clients with the community-documented `--fastmp` launch flags, run from the game folder:
+
+```bat
+start "" SlayTheSpire2.exe --fastmp=host -wpos 0 0
+start "" SlayTheSpire2.exe --fastmp=join --clientId=1001 -wpos 960 0
+```
+
+## Contributing
+
+- `main` is always releasable. Work happens on feature branches and merges through pull requests.
+- Commit messages use a type prefix and a capitalized imperative summary, for example `feat: Add first-click decision resolver`.
+
+## Credits
+
+- Rules adapted from [Slay the Soul-Link](https://docs.google.com/document/d/1XyDEOh4QqVfNqKOosRGrHEikjtB77w95TzjEURAe4lY/edit?tab=t.0) by Rayditz and naturesbf.
+- Built on [BaseLib](https://github.com/Alchyr/BaseLib-StS2) and [ModTemplate-StS2](https://github.com/Alchyr/ModTemplate-StS2) by Alchyr.
+
+No license has been chosen yet.

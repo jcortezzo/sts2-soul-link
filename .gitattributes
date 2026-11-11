@@ -1,0 +1,7 @@
+# Normalize EOL for all files that Git considers text files.
+* text=auto eol=lf
+
+# Visual Studio expects Windows line endings in solution files.
+*.sln text eol=crlf
+
+*.png binary

@@ -1,0 +1,16 @@
+<Project>
+    <!--
+      Copy this file to Directory.Build.props (git-ignored) to override local paths.
+      Neither setting is needed for a normal `dotnet build` on a default Steam install.
+    -->
+    <PropertyGroup>
+        <!-- Only needed if Slay the Spire 2 isn't found automatically through Steam. -->
+        <!-- <Sts2Path>D:/SteamLibrary/steamapps/common/Slay the Spire 2</Sts2Path> -->
+
+        <!--
+          Only needed for `dotnet publish`, which packs assets into a .pck with MegaDot / Godot 4.5.1 mono.
+          The mod currently ships no assets, so `dotnet build` is all you need.
+        -->
+        <!-- <GodotPath>C:/megadot/MegaDot_v4.5.1-stable_mono_win64.exe</GodotPath> -->
+    </PropertyGroup>
+</Project>

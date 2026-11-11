@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <!--
+      Pure rules engine: no game, Godot or Harmony references, so it can be unit tested anywhere.
+      The mod project compiles these sources directly into SoulLink.dll, so the mod ships as one assembly.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net9.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>SoulLink.Core</RootNamespace>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="SoulLink.Core.Tests" />
+    </ItemGroup>
+
+</Project>

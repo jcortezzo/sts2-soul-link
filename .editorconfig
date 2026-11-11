@@ -1,0 +1,27 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.sln]
+end_of_line = crlf
+indent_style = tab
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# Don't suggest removing or adding `this.` to fields/properties/methods (from Alchyr's mod template)
+dotnet_diagnostic.IDE0009.severity = none
+dotnet_diagnostic.IDE0003.severity = none
+
+csharp_style_namespace_declarations = file_scoped:suggestion
+dotnet_sort_system_directives_first = true
