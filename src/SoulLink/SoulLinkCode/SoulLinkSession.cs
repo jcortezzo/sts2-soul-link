@@ -69,15 +69,17 @@ internal sealed class SoulLinkSession
 
         var session = new SoulLinkSession(net, IsHostService(net));
         Current = session;
-        while (EarlyMessages.TryDequeue(out var deliver))
-        {
-            deliver(session);
-        }
-
         MainFile.Logger.Info($"Soul Link session started as {(session.IsHost ? "host" : "client")} ({net.Type}).");
+
+        // The host starts the run before handling requests that arrived early, so they aren't refused.
         if (session.IsHost)
         {
             session.Submit("run", SyncActions.RunStart, SyncState.StartArgs(SoulLinkConfig.ToSettings()));
+        }
+
+        while (EarlyMessages.TryDequeue(out var deliver))
+        {
+            deliver(session);
         }
     }
 
