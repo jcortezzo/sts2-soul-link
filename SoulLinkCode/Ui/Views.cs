@@ -1,3 +1,4 @@
+using SoulLink.SoulLinkCode.Campfires;
 using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Rewards;
@@ -13,6 +14,7 @@ internal static class Views
         Refresh("relic reward", () => RelicRewardLinks.Refresh(CardRewardExecutor.RewardsScreen, CardRewardLinks.CurrentSet));
         Refresh("event", EventView.Refresh);
         Refresh("chest", ChestLinks.Refresh);
+        Refresh("campfire", CampfireLinks.Refresh);
     }
 
     /// <summary>

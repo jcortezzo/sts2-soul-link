@@ -134,14 +134,29 @@ public class CampfireSessionTests
     }
 
     [Theory]
+    [InlineData("HEAL", CampfireCategory.Recover)]
     [InlineData("REST", CampfireCategory.Recover)]
     [InlineData("mend", CampfireCategory.Recover)]
+    [InlineData("DIG", CampfireCategory.Improve)]
+    [InlineData("CLONE", CampfireCategory.Improve)]
     [InlineData("SMITH", CampfireCategory.Improve)]
     [InlineData("LIFT", CampfireCategory.Improve)]
     [InlineData("SOMETHING_A_RELIC_ADDS", CampfireCategory.Improve)]
     public void Options_belong_to_categories(string optionId, CampfireCategory expected)
     {
         Assert.Equal(expected, CategoryOf(optionId));
+    }
+
+    [Fact]
+    public void Campers_are_listed_in_the_order_they_arrive()
+    {
+        var campfire = NewCampfire(LinkMode.Nice, WhoDecides.EveryoneAgrees);
+        campfire.Join(Cal, [new(Rest)], hasMiniatureTent: false);
+        campfire.Join(Ana, [new(Rest)], hasMiniatureTent: true);
+
+        Assert.Equal([Cal, Ana], campfire.Campers);
+        Assert.True(campfire.IsAt(Ana));
+        Assert.False(campfire.IsAt(Ben));
     }
 
     [Fact]

@@ -18,10 +18,11 @@ public readonly record struct CampfireOption(string Id, bool Available = true);
 /// <summary>An option a player does at a campfire, by the id the game gave it.</summary>
 public readonly record struct CampfireChoice(PlayerId Player, string OptionId);
 
-/// <summary>Campfire option ids and their categories.</summary>
+/// <summary>Campfire option ids, as the game names them, and their categories.</summary>
 public static class CampfireOptions
 {
-    public const string Rest = "REST";
+    /// <summary>Rest, which the game calls HEAL.</summary>
+    public const string Rest = "HEAL";
     public const string Mend = "MEND";
     public const string Smith = "SMITH";
     public const string Dig = "DIG";
@@ -30,7 +31,7 @@ public static class CampfireOptions
 
     /// <summary>Rest and Mend recover; every other option improves, including ones added by relics or quests.</summary>
     public static CampfireCategory CategoryOf(string optionId) =>
-        Is(optionId, Rest) || Is(optionId, Mend) ? CampfireCategory.Recover : CampfireCategory.Improve;
+        Is(optionId, Rest) || Is(optionId, "REST") || Is(optionId, Mend) ? CampfireCategory.Recover : CampfireCategory.Improve;
 
     /// <summary>The option key of a category in <see cref="CampfireSession.Category"/>.</summary>
     public static OptionKey KeyOf(CampfireCategory category) => OptionKey.Named(category.ToString().ToLowerInvariant());
@@ -53,6 +54,7 @@ public static class CampfireOptions
 public sealed class CampfireSession
 {
     private readonly Dictionary<PlayerId, Camper> _campers = new();
+    private readonly List<PlayerId> _arrivals = [];
 
     /// <param name="mode">Nice or mean, from the settings.</param>
     /// <param name="matching">How Smith targets are matched.</param>
@@ -71,6 +73,12 @@ public sealed class CampfireSession
 
     /// <summary>Recover or Improve, linked among the players without Miniature Tent.</summary>
     public OptionDecision Category { get; }
+
+    /// <summary>The players at the campfire, in the order they arrived.</summary>
+    public IReadOnlyList<PlayerId> Campers => _arrivals;
+
+    /// <summary>Whether the player has arrived at the campfire.</summary>
+    public bool IsAt(PlayerId player) => _campers.ContainsKey(player);
 
     /// <summary>
     /// Which card each player who Smiths upgrades. Everyone who could Smith joins when they arrive, so mean mode only
@@ -104,6 +112,7 @@ public sealed class CampfireSession
         }
 
         _campers[player] = new Camper(list, hasMiniatureTent);
+        _arrivals.Add(player);
         if (!hasMiniatureTent)
         {
             Category.Join(player, [CategoryOption(list, CampfireCategory.Recover), CategoryOption(list, CampfireCategory.Improve)]);

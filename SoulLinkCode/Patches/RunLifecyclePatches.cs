@@ -1,6 +1,7 @@
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Runs;
+using SoulLink.SoulLinkCode.Campfires;
 using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Linking;
@@ -39,5 +40,6 @@ internal static class RunLifecyclePatches
         EventLinks.Reset();
         EventExecutor.Reset();
         ChestLinks.Reset();
+        CampfireLinks.Reset();
     }
 }
