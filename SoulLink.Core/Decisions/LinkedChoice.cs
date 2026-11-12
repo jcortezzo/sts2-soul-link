@@ -520,8 +520,24 @@ public abstract class LinkedChoice<TAtom>
         var group = new List<(PlayerId Player, Selection<TAtom> Choice, int Sequence)>();
         foreach (var player in _participants)
         {
-            if (_decided.ContainsKey(player) || IsProspect?.Invoke(player) == true || !TryFollow(link, choice.Count, player, out var required)
-                || (player != voter && !CanCommit(player, required).IsAllowed))
+            if (_decided.ContainsKey(player) || IsProspect?.Invoke(player) == true)
+            {
+                continue;
+            }
+
+            // The voter always counts for their own pick, even one nobody can match, like an unlinked card with linked
+            // cards matching: it can't be resolved back to them, but leaving them out would leave a group with no one
+            // in it, and their vote could never be made.
+            Selection<TAtom> required;
+            if (player == voter)
+            {
+                required = choice;
+            }
+            else if (TryFollow(link, choice.Count, player, out var match) && CanCommit(player, match).IsAllowed)
+            {
+                required = match;
+            }
+            else
             {
                 continue;
             }

@@ -488,4 +488,43 @@ public class SyncTests
         Assert.Null(replica.Missing);
         Assert.Equal(choose.Sequence, replica.Applied);
     }
+
+    [Fact]
+    public void An_unlinked_pick_goes_through_with_everyone_agrees()
+    {
+        // Linked cards with no links between the two decks: neither player can follow the other's pick, so each one's
+        // pick is theirs alone and must go through, rather than wait on a group nobody belongs to.
+        var network = new SyncTestNetwork(SoulLinkSettings.Default with { CardMatching = CardMatching.LinkedCards });
+        const string screen = "f3/event/1|slot:1/cards-1";
+        network.Send(screen, Ana, SyncActions.CardsJoin, CardTable.JoinArgs(1, Screen(Ana, 5).Cards));
+        network.Send(screen, Ben, SyncActions.CardsJoin, CardTable.JoinArgs(1, Screen(Ben, 5).Cards));
+
+        network.Send(screen, Ana, SyncActions.CardsChoose, SyncArgs.Number(Card(Ana, 3).Value));
+        Assert.Equal(Selection.Of(Card(Ana, 3)), network.Agreed(state => state.Find<CardTable>(screen)!.Decision.CommitOf(Ana)?.Choice));
+        Assert.Null(network.Agreed(state => state.Find<CardTable>(screen)!.Decision.CommitOf(Ben)));
+
+        Assert.True(network.Send(screen, Ben, SyncActions.CardsChoose, SyncArgs.Number(Card(Ben, 1).Value)).IsAccepted);
+        Assert.Equal(Selection.Of(Card(Ben, 1)), network.Agreed(state => state.Find<CardTable>(screen)!.Decision.CommitOf(Ben)?.Choice));
+    }
+
+    [Fact]
+    public void A_linked_pick_still_waits_for_the_teammate_with_everyone_agrees()
+    {
+        var network = new SyncTestNetwork(SoulLinkSettings.Default with { CardMatching = CardMatching.LinkedCards });
+        foreach (var state in network.States)
+        {
+            state.Run!.Links.Link([Ref(Ana, 3), Ref(Ben, 4)]);
+        }
+
+        const string screen = "f3/event/1|slot:1/cards-1";
+        network.Send(screen, Ana, SyncActions.CardsJoin, CardTable.JoinArgs(1, Screen(Ana, 5).Cards));
+        network.Send(screen, Ben, SyncActions.CardsJoin, CardTable.JoinArgs(1, Screen(Ben, 5).Cards));
+
+        network.Send(screen, Ana, SyncActions.CardsChoose, SyncArgs.Number(Card(Ana, 3).Value));
+        Assert.Null(network.Agreed(state => state.Find<CardTable>(screen)!.Decision.CommitOf(Ana)));
+
+        network.Send(screen, Ben, SyncActions.CardsChoose, SyncArgs.Number(Card(Ben, 4).Value));
+        Assert.Equal(Selection.Of(Card(Ana, 3)), network.Agreed(state => state.Find<CardTable>(screen)!.Decision.CommitOf(Ana)?.Choice));
+        Assert.Equal(Selection.Of(Card(Ben, 4)), network.Agreed(state => state.Find<CardTable>(screen)!.Decision.CommitOf(Ben)?.Choice));
+    }
 }

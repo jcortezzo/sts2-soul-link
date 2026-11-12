@@ -2,6 +2,7 @@ using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
@@ -115,4 +116,33 @@ internal static class CardScreenAccess
 {
     public static readonly AccessTools.FieldRef<NCardGridSelectionScreen, TaskCompletionSource<IEnumerable<CardModel>>?> Completion =
         AccessTools.FieldRefAccess<NCardGridSelectionScreen, TaskCompletionSource<IEnumerable<CardModel>>?>("_completionSource");
+}
+
+/// <summary>
+/// Keeps card ids and links when the game rebuilds a teammate's deck from the copy their game sent, which it does on
+/// every room entry.
+/// </summary>
+[HarmonyPatch]
+internal static class DeckResyncPatches
+{
+    [HarmonyPatch(typeof(Player), nameof(Player.SyncWithSerializedPlayer))]
+    [HarmonyPrefix]
+    private static void Before(Player __instance) => Guard(() => CardIds.BeginResync(__instance));
+
+    /// <summary>Runs even if the game's rebuild throws, so the deck never stays marked as rebuilding.</summary>
+    [HarmonyPatch(typeof(Player), nameof(Player.SyncWithSerializedPlayer))]
+    [HarmonyFinalizer]
+    private static void After(Player __instance) => Guard(() => CardIds.EndResync(__instance));
+
+    private static void Guard(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            MainFile.Logger.Error($"Soul Link couldn't keep a deck's card ids: {ex}");
+        }
+    }
 }
