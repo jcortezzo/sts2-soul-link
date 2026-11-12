@@ -84,7 +84,7 @@ public static class SyncActions
     /// <summary>Leaves a card choice.</summary>
     public const string CardsLeave = "cards.leave";
 
-    /// <summary>Joins a card reward screen. Args: card count, can reroll, then extra sources.</summary>
+    /// <summary>Joins a card reward screen. Args: screen number, card count, can reroll, can sacrifice, then extra sources.</summary>
     public const string RewardJoin = "reward.join";
 
     /// <summary>Commits a card reward pick. Args: the option key.</summary>

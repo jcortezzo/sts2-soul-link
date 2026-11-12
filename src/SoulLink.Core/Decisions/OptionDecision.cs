@@ -66,6 +66,8 @@ public sealed class OptionDecision : LinkedChoice<OptionKey>
     protected override bool IsExclusive(Selection<OptionKey> choice) =>
         choice.Items.Any(key => key.IsExtra && !Participants.All(player => IsAvailable(player, key)));
 
+    protected override bool IsSeparate(Selection<OptionKey> choice) => choice.Items.Any(key => key.IsSeparate);
+
     private static List<DecisionOption> Validate(IEnumerable<DecisionOption> options)
     {
         ArgumentNullException.ThrowIfNull(options);

@@ -33,7 +33,7 @@ public enum OptionState
     /// <summary>The player has to take it: someone chose this first.</summary>
     Required,
 
-    /// <summary>An exclusive extra the player may take instead of following (nice mode).</summary>
+    /// <summary>An option the player may take instead of following: an exclusive extra in nice mode, or a separate option.</summary>
     Escape,
 
     /// <summary>Blocked because the player is bound to another option.</summary>

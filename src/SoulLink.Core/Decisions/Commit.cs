@@ -9,7 +9,7 @@ public enum CommitKind
     /// <summary>The player made the choice they were bound to. Binds no one.</summary>
     Follow,
 
-    /// <summary>The player was bound but took an exclusive extra option instead, which nice mode allows.</summary>
+    /// <summary>The player was bound but took an exclusive extra (nice mode) or a separate option instead.</summary>
     Escape,
 }
 
@@ -23,8 +23,8 @@ public enum CommitKind
 /// <param name="Kind">Whether they led, followed or escaped.</param>
 /// <param name="Follows">For a follow, the sequence of the commit that bound them.</param>
 /// <param name="Overrides">
-/// True for an exclusive extra option: it binds the other players who have the same extra, even ones already
-/// bound to something else.
+/// True for an exclusive extra or a separate option: it binds the other players who have the same option, even ones
+/// already bound to something else.
 /// </param>
 /// <param name="Mode">The mode in force when this commit was made. The first commit fixes the mode for the decision.</param>
 public sealed record Commit<TAtom>(

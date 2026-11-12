@@ -7,8 +7,10 @@ public static class CardRewardKeys
 {
     public static OptionKey Skip => OptionKey.Skip;
 
-    /// <summary>Pael's Wing: sacrificing a card reward counts as skipping it.</summary>
-    public static OptionKey Sacrifice => OptionKey.Skip;
+    /// <summary>
+    /// Pael's Wing: sacrificing a card reward is linked only among Pael's Wing holders, separately from the card pick.
+    /// </summary>
+    public static OptionKey Sacrifice { get; } = OptionKey.Separate("PAELS_WING");
 
     /// <summary>A card, counted from 1 left to right.</summary>
     public static OptionKey Card(int slot) => OptionKey.Slot(slot);
@@ -21,7 +23,8 @@ public static class CardRewardKeys
 /// <param name="Cards">How many regular cards the screen shows.</param>
 /// <param name="Extras">Sources of extra cards on this screen, like <c>LASTING_CANDY</c>.</param>
 /// <param name="CanReroll">Whether the player can reroll this screen, for example with Driftwood.</param>
-public sealed record CardRewardOffer(int Cards, IReadOnlyList<string>? Extras = null, bool CanReroll = false)
+/// <param name="CanSacrifice">Whether the player can sacrifice this screen with Pael's Wing.</param>
+public sealed record CardRewardOffer(int Cards, IReadOnlyList<string>? Extras = null, bool CanReroll = false, bool CanSacrifice = false)
 {
     internal IEnumerable<DecisionOption> ToOptions()
     {
@@ -33,6 +36,11 @@ public sealed record CardRewardOffer(int Cards, IReadOnlyList<string>? Extras = 
         foreach (var source in Extras ?? [])
         {
             yield return new DecisionOption(CardRewardKeys.Extra(source));
+        }
+
+        if (CanSacrifice)
+        {
+            yield return new DecisionOption(CardRewardKeys.Sacrifice);
         }
 
         yield return new DecisionOption(CardRewardKeys.Skip);

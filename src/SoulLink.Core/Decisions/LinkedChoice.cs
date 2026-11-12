@@ -12,13 +12,17 @@ namespace SoulLink.Core.Decisions;
 /// </para>
 /// <list type="bullet">
 /// <item>A lead (a commit by an unbound player) binds every other undecided player who can follow it and isn't bound yet.</item>
-/// <item>An exclusive extra binds the other holders of that extra, even ones already bound to something else.</item>
+/// <item>An exclusive extra or a separate option binds the other players who have it, even ones already bound to something else.</item>
 /// <item>A follow binds no one, so players who can't follow the first choice stay free.</item>
 /// </list>
 /// <para>
 /// Mean mode only changes which choices are allowed: an unbound player may only pick choices that every other
 /// unbound, undecided player could follow, so the first commit binds everyone. If any player has no such choice, the
 /// decision falls back to nice mode. The first commit fixes the mode for the rest of the decision.
+/// </para>
+/// <para>
+/// A separate option, like Pael's Wing's sacrifice, is linked only among the players who have it: in both modes it can
+/// be taken instead of following and is never greyed out because others lack it.
 /// </para>
 /// </remarks>
 /// <typeparam name="TAtom">One pickable option, like an <see cref="OptionKey"/> or a card.</typeparam>
@@ -140,13 +144,10 @@ public abstract class LinkedChoice<TAtom>
                 return CommitCheck.Allowed;
             }
 
-            // An exclusive extra can always be taken instead of following, in nice mode.
-            return mode == LinkMode.Nice && IsExclusive(choice)
-                ? CommitCheck.Allowed
-                : CommitCheck.MustFollow(binding.Source.Player);
+            return CanTakeInstead(choice, mode) ? CommitCheck.Allowed : CommitCheck.MustFollow(binding.Source.Player);
         }
 
-        if (mode == LinkMode.Mean && HasMeanChoice(player) && FirstWhoCannotFollow(player, choice) is { } blocker)
+        if (mode == LinkMode.Mean && !IsSeparate(choice) && HasMeanChoice(player) && FirstWhoCannotFollow(player, choice) is { } blocker)
         {
             return CommitCheck.GreyedOut(blocker);
         }
@@ -176,7 +177,7 @@ public abstract class LinkedChoice<TAtom>
             Link: Describe(player, choice),
             Kind: kind,
             Follows: kind == CommitKind.Follow ? binding!.Source.Sequence : null,
-            Overrides: kind != CommitKind.Follow && IsExclusive(choice),
+            Overrides: kind != CommitKind.Follow && (IsExclusive(choice) || IsSeparate(choice)),
             Mode: mode);
         Record(commit);
         return commit;
@@ -249,6 +250,9 @@ public abstract class LinkedChoice<TAtom>
     /// <summary>Whether the selection includes an extra option that not every participant has.</summary>
     protected virtual bool IsExclusive(Selection<TAtom> choice) => false;
 
+    /// <summary>Whether the selection includes a separate option, linked only among the players who have it.</summary>
+    protected virtual bool IsSeparate(Selection<TAtom> choice) => false;
+
     protected void AddParticipant(PlayerId player)
     {
         if (_participants.Contains(player))
@@ -266,6 +270,13 @@ public abstract class LinkedChoice<TAtom>
             throw new ArgumentException($"{player} isn't facing this decision.", nameof(player));
         }
     }
+
+    /// <summary>
+    /// Whether a bound player may take this instead of following: a separate option always, an exclusive extra in
+    /// nice mode.
+    /// </summary>
+    private bool CanTakeInstead(Selection<TAtom> choice, LinkMode mode) =>
+        IsSeparate(choice) || (mode == LinkMode.Nice && IsExclusive(choice));
 
     private void Record(Commit<TAtom> commit)
     {
@@ -375,12 +386,12 @@ public abstract class LinkedChoice<TAtom>
                 return new OptionView<TAtom>(option, OptionState.Required, binding.Source.Player);
             }
 
-            return mode == LinkMode.Nice && IsExclusive(Selection.Of(option))
+            return CanTakeInstead(Selection.Of(option), mode)
                 ? new OptionView<TAtom>(option, OptionState.Escape, binding.Source.Player)
                 : new OptionView<TAtom>(option, OptionState.Locked, binding.Source.Player);
         }
 
-        if (meanApplies && FirstWhoCannotFollow(player, Selection.Of(option)) is { } blocker)
+        if (meanApplies && !IsSeparate(Selection.Of(option)) && FirstWhoCannotFollow(player, Selection.Of(option)) is { } blocker)
         {
             return new OptionView<TAtom>(option, OptionState.GreyedOut, blocker);
         }

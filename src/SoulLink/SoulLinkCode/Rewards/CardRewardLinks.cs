@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.CardRewardAlternatives;
+using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Rewards;
 using SoulLink.Core.Decisions;
 using SoulLink.Core.Rewards;
@@ -17,6 +18,9 @@ namespace SoulLink.SoulLinkCode.Rewards;
 internal static class CardRewardLinks
 {
     public const string RerollId = "REROLL";
+
+    /// <summary>Pael's Wing's button, which the relic always adds for its owner.</summary>
+    public const string SacrificeId = "SACRIFICE";
 
     /// <summary>Lasting Candy's bonus card, the one extra card a relic adds to reward screens.</summary>
     public const string LastingCandySource = "LASTING_CANDY";
@@ -124,11 +128,15 @@ internal static class CardRewardLinks
     }
 
     /// <summary>
-    /// The option key of a button below the cards, or null for a reroll, which isn't a commit. Skip and Pael's Wing's
-    /// sacrifice both count as skipping, and so does any button another mod adds.
+    /// The option key of a button below the cards, or null for a reroll, which isn't a commit. Pael's Wing's sacrifice
+    /// is linked only among holders; Skip and any button another mod adds count as skipping.
     /// </summary>
-    public static OptionKey? KeyOfAlternative(CardRewardAlternative alternative) =>
-        alternative.OptionId == RerollId ? null : CardRewardKeys.Skip;
+    public static OptionKey? KeyOfAlternative(CardRewardAlternative alternative) => alternative.OptionId switch
+    {
+        RerollId => null,
+        SacrificeId => CardRewardKeys.Sacrifice,
+        _ => CardRewardKeys.Skip,
+    };
 
     /// <summary>The operation that commits a key on the reward's screen, checked against the local linked state.</summary>
     public static GatedOp Commit(string table, OptionKey key) =>
@@ -160,7 +168,7 @@ internal static class CardRewardLinks
             }
         }
 
-        return new CardRewardOffer(cards, extras, reward.CanReroll);
+        return new CardRewardOffer(cards, extras, reward.CanReroll, CanSacrifice: reward.Player.Relics.OfType<PaelsWing>().Any());
     }
 
     public static IReadOnlyList<CardCreationResult> OptionsOf(CardReward reward) => RewardAccess.Cards(reward);

@@ -204,7 +204,7 @@ public sealed class RewardTable : SyncTable
 
     /// <summary>Arguments for <see cref="SyncActions.RewardReroll"/>: the new offer.</summary>
     public static IReadOnlyList<string> OfferArgs(CardRewardOffer offer) =>
-        [SyncArgs.Number(offer.Cards), SyncArgs.Flag(offer.CanReroll), .. offer.Extras ?? []];
+        [SyncArgs.Number(offer.Cards), SyncArgs.Flag(offer.CanReroll), SyncArgs.Flag(offer.CanSacrifice), .. offer.Extras ?? []];
 
     protected override IReadOnlyList<string> Handle(SyncOp op, IReadOnlyList<string>? replay)
     {
@@ -249,8 +249,9 @@ public sealed class RewardTable : SyncTable
         }
 
         var canReroll = args.Bool();
+        var canSacrifice = args.Bool();
         var extras = args.Rest();
-        return new CardRewardOffer(cards, extras, canReroll);
+        return new CardRewardOffer(cards, extras, canReroll, canSacrifice);
     }
 }
 

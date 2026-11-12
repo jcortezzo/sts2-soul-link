@@ -8,6 +8,7 @@ public class CardRewardRoundTests
 {
     private static readonly CardRewardOffer Three = new(3);
     private static readonly CardRewardOffer ThreeWithDriftwood = new(3, CanReroll: true);
+    private static readonly CardRewardOffer ThreeWithPaelsWing = new(3, CanSacrifice: true);
 
     [Fact]
     public void Extra_screens_are_linked_among_the_players_who_have_them()
@@ -38,17 +39,37 @@ public class CardRewardRoundTests
     }
 
     [Fact]
-    public void Sacrificing_with_Paels_Wing_counts_as_skipping()
+    public void Paels_Wing_sacrifices_bind_only_other_holders()
     {
         var round = new CardRewardRound(LinkMode.Nice);
-        round.Join(Ana, [Three]);
-        round.Join(Ben, [Three]);
+        round.Join(Ana, [ThreeWithPaelsWing]);
+        round.Join(Ben, [ThreeWithPaelsWing]);
+        round.Join(Cal, [Three]);
         var screen = round.Screen(1);
 
         screen.Commit(Ana, CardRewardKeys.Sacrifice);
 
         Assert.Equal(CommitCheck.MustFollow(Ana), screen.CanCommit(Ben, CardRewardKeys.Card(1)));
-        Assert.True(screen.CanCommit(Ben, CardRewardKeys.Skip).IsAllowed);
+        Assert.True(screen.CanCommit(Ben, CardRewardKeys.Sacrifice).IsAllowed);
+        Assert.Equal(ChoiceState.Free, screen.Decision.StatusOf(Cal).State);
+        Assert.True(screen.CanCommit(Cal, CardRewardKeys.Card(3)).IsAllowed);
+    }
+
+    [Theory]
+    [InlineData(LinkMode.Nice)]
+    [InlineData(LinkMode.Mean)]
+    public void A_holder_can_sacrifice_instead_of_following_a_card_pick(LinkMode mode)
+    {
+        var round = new CardRewardRound(mode);
+        round.Join(Ana, [ThreeWithPaelsWing]);
+        round.Join(Ben, [ThreeWithPaelsWing]);
+        round.Join(Cal, [Three]);
+        var screen = round.Screen(1);
+        screen.Commit(Cal, CardRewardKeys.Card(2));
+
+        Assert.True(screen.CanCommit(Ana, CardRewardKeys.Sacrifice).IsAllowed);
+        Assert.Equal(CommitKind.Escape, screen.Commit(Ana, CardRewardKeys.Sacrifice).Kind);
+        Assert.Equal(CommitCheck.MustFollow(Ana), screen.CanCommit(Ben, CardRewardKeys.Card(2)));
     }
 
     [Fact]

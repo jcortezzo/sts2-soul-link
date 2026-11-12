@@ -53,7 +53,7 @@ Everyone takes the same slot, or everyone skips. Slots count left to right on ea
 - **Fewer cards:** if your screen lacks the chosen slot, you can't follow. Nice: you choose. Mean: that slot was greyed out.
 - **Extra reward screens:** card reward screens are matched in order, and screen 2 is shared only by players who have a second one. This covers Prayer Wheel, Dream Catcher and [The Hunt](https://metabot.gg/en/slay-the-spire-2/card/the_hunt) (an extra card reward on a fatal hit). A screen only you have is yours to pick from freely, in both modes.
 - **Extra cards on a screen:** an extra card only some players have, like [Lasting Candy](https://metabot.gg/en/slay-the-spire-2/relic/lasting_candy)'s bonus Power every other combat, is an exclusive option. Nice: the holder may take it instead of following. Mean: it's greyed out unless everyone has one.
-- **Pael's Wing (proposed):** sacrificing counts as skipping. If a holder sacrifices first, everyone else skips; when the group skips, holders may sacrifice instead.
+- **Pael's Wing:** sacrificing is linked only among Pael's Wing holders, separately from the card pick. When a holder sacrifices, the other holders who haven't picked must sacrifice too, and players without Pael's Wing aren't affected. In both modes, a holder can sacrifice instead of following a card pick.
 - **Driftwood (proposed):** rerolls are linked among Driftwood holders. When one rerolls a screen, the other holders who can must reroll theirs. A reroll isn't a commit; the first pick still decides the slot.
 
 ## Deck card actions
@@ -169,7 +169,7 @@ Each example is a scenario the mod must handle exactly this way, so each one bec
 These fill gaps we haven't explicitly agreed on.
 
 - **Defaults:** Linked cards and Nice mode.
-- **Relics:** Pael's Wing sacrifice counts as Skip; Driftwood rerolls are linked among holders.
+- **Relics:** Driftwood rerolls are linked among holders.
 - **Links:** starters pair by name in deck order; transforming keeps a link; duplicating makes a new group.
 - **Shops:** purchase obligations last until the party leaves the shop.
 - **Campfires:** options added by relics or quests count as Improve.

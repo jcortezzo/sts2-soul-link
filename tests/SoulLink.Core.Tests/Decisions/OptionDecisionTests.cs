@@ -141,6 +141,21 @@ public class OptionDecisionTests
     }
 
     [Fact]
+    public void Mean_never_greys_out_a_separate_option()
+    {
+        var sacrifice = OptionKey.Separate("PAELS_WING");
+        var decision = new OptionDecision(LinkMode.Mean);
+        decision.Join(Ana, CardReward(3).Append(new DecisionOption(sacrifice)));
+        decision.Join(Ben, CardReward(3));
+
+        Assert.True(decision.CanCommit(Ana, sacrifice).IsAllowed);
+        Assert.Contains(new OptionView<OptionKey>(sacrifice, OptionState.Open), decision.ViewOptions(Ana));
+
+        decision.Commit(Ana, sacrifice);
+        Assert.Equal(ChoiceState.Free, decision.StatusOf(Ben).State);
+    }
+
+    [Fact]
     public void Mean_first_commit_binds_everyone()
     {
         var decision = ThreePlayers(LinkMode.Mean);
