@@ -2,6 +2,7 @@ using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Events;
 using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Events;
 using SoulLink.Core;
 using SoulLink.Core.Decisions;
@@ -17,6 +18,8 @@ namespace SoulLink.SoulLinkCode.Events;
 /// </summary>
 internal static class EventView
 {
+    /// <summary>How far the portraits on an Ancient's option stay from its bottom edge.</summary>
+    private const float AncientVoteMargin = 4;
     private static readonly AccessTools.FieldRef<NEventOptionButton, Tween?> AnimInTweenField =
         AccessTools.FieldRefAccess<NEventOptionButton, Tween?>("_animInTween");
 
@@ -41,6 +44,31 @@ internal static class EventView
 
             Dim.Set(button, page is { } linked && IsBlocked(linked, button));
             button.RefreshVotes();
+            if (button.Event is AncientEventModel)
+            {
+                KeepVotesInside(button);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Keeps the portraits on an Ancient's option inside the option, so nothing around it cuts them off. The game
+    /// never shows votes on Ancient options itself, so their portrait row isn't made to fit.
+    /// </summary>
+    private static void KeepVotesInside(NEventOptionButton button)
+    {
+        if (button.VoteContainer is not { } votes || !GodotObject.IsInstanceValid(votes))
+        {
+            return;
+        }
+
+        votes.ClipContents = false;
+        var height = votes.GetChildren().OfType<Control>().Select(icon => icon.GetCombinedMinimumSize().Y).DefaultIfEmpty(0f).Max() * votes.Scale.Y;
+        var limit = button.Size.Y - AncientVoteMargin;
+        if (height > 0 && votes.Position.Y + height > limit)
+        {
+            // The row is the option's own child, so its position is in the option's coordinates.
+            votes.Position = new Vector2(votes.Position.X, Math.Max(0, limit - height));
         }
     }
 
