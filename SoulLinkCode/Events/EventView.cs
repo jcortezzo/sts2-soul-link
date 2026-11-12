@@ -1,16 +1,19 @@
 using Godot;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Events;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Events;
 using SoulLink.Core;
 using SoulLink.Core.Decisions;
+using SoulLink.SoulLinkCode.Linking;
 using SoulLink.SoulLinkCode.Ui;
 
 namespace SoulLink.SoulLinkCode.Events;
 
 /// <summary>
 /// The lock and vote indicators on a linked event page. Teammates' portraits sit on the options they clicked, as the
-/// game shows votes on group events; options the local player can't take are dimmed; and a line at the top says
-/// what each linked player has picked so far.
+/// game shows votes on group events, options the local player can't take are dimmed, and hovering an option shows
+/// each teammate's option in the same slot when theirs is different.
 /// </summary>
 internal static class EventView
 {
@@ -39,8 +42,6 @@ internal static class EventView
             Dim.Set(button, page is { } linked && IsBlocked(linked, button));
             button.RefreshVotes();
         }
-
-        StatusLine.Set(room, page is { } shown ? Status(shown) : "");
     }
 
     /// <summary>Re-applies the indicators once a button's entrance animation ends, since it fades the button in.</summary>
@@ -75,6 +76,60 @@ internal static class EventView
             && (page.Decision.VoteOf(player)?.Contains(key) == true || page.Decision.CommitOf(player)?.Choice.Contains(key) == true);
     }
 
+    /// <summary>
+    /// Slot peek: each teammate's option in the hovered slot, when it differs from the local player's, as at an
+    /// Ancient, where everyone is offered different relics, or when they can't take it. Every player's event runs on
+    /// every machine, so nothing needs sharing.
+    /// </summary>
+    public static IReadOnlyList<IHoverTip> Peek(NEventOptionButton button)
+    {
+        if (Current() is not { } page || button.Option is not { } mine || OptionLinks.RunState is not { } state)
+        {
+            return [];
+        }
+
+        var index = IndexGetter(button);
+        var tips = new List<IHoverTip>();
+        foreach (var teammate in state.Players)
+        {
+            var player = OptionLinks.IdOf(teammate);
+            if (player == page.Me
+                || EventLinks.EventOf(teammate) is not { } ev
+                || ev.IsShared
+                || index < 0
+                || index >= ev.CurrentOptions.Count
+                || EventLinks.TableId(ev) != page.Table)
+            {
+                continue;
+            }
+
+            var theirs = ev.CurrentOptions[index];
+            var available = EventLinks.IsAvailable(ev, theirs);
+            if (!Same(mine, theirs))
+            {
+                var description = PeekTips.Text(theirs.Description) ?? "";
+                if (!available)
+                {
+                    description = description.Length > 0 ? $"{description}\nThey can't take it." : "They can't take it.";
+                }
+
+                tips.Add(PeekTips.About(player, description, PeekTips.Text(theirs.Title), theirs.Relic?.Icon));
+            }
+            else if (!available)
+            {
+                tips.Add(PeekTips.About(player, "Can't take this option."));
+            }
+        }
+
+        return tips;
+    }
+
+    private static bool Same(EventOption mine, EventOption theirs) =>
+        mine.TextKey == theirs.TextKey
+        && mine.Relic?.Id == theirs.Relic?.Id
+        && PeekTips.Text(mine.Title) == PeekTips.Text(theirs.Title)
+        && PeekTips.Text(mine.Description) == PeekTips.Text(theirs.Description);
+
     private static LinkedPage? Current()
     {
         if (SoulLinkSession.Current is not { Run: not null } session
@@ -96,36 +151,6 @@ internal static class EventView
             && view.State is OptionState.Locked or OptionState.GreyedOut or OptionState.NotChosen;
     }
 
-
-    /// <summary>What each linked player has picked so far, like "You: want option 2     Ben: chose option 2".</summary>
-    private static string Status(LinkedPage page)
-    {
-        if (page.Decision.Participants.Count < 2 && EventExecutor.Held is null)
-        {
-            return "";
-        }
-
-        return StatusLine.Join(page.Session, page.Decision.Participants, (player, isMe) => Doing(page, player, isMe));
-    }
-
-    private static string Doing(LinkedPage page, PlayerId player, bool isMe)
-    {
-        var decision = page.Decision;
-        if (decision.CommitOf(player)?.Choice.Items[0] is { } chosen)
-        {
-            return $"chose {EventLinks.Describe(chosen)}";
-        }
-
-        if (isMe && EventExecutor.Held is { } held && held.Table == page.Table)
-        {
-            var names = string.Join(", ", held.Awaiting.Select(page.Session.NameOf));
-            return $"want {EventLinks.Describe(held.Key)} (waiting for {names})";
-        }
-
-        return decision.VoteOf(player)?.Items[0] is { } vote
-            ? $"{(isMe ? "want" : "wants")} {EventLinks.Describe(vote)}"
-            : "choosing";
-    }
 
     private sealed record LinkedPage(SoulLinkSession Session, string Table, OptionDecision Decision)
     {

@@ -105,7 +105,7 @@ internal static class CampfireLinks
         Callable.From(Run).CallDeferred();
     }
 
-    /// <summary>Shows who picked each option, dims options outside the linked category, and updates the status line.</summary>
+    /// <summary>Shows who picked each option, and dims options outside the linked category.</summary>
     public static void Refresh()
     {
         if (Room() is not { } room)
@@ -115,7 +115,6 @@ internal static class CampfireLinks
 
         if (OptionLinks.Session is not { } session || TableId() is not { } table || Campfire(table) is not { } campfire)
         {
-            StatusLine.Set(room, "");
             return;
         }
 
@@ -133,10 +132,6 @@ internal static class CampfireLinks
             var backers = campfire.Campers.Where(player => Picked(campfire, player, option.OptionId)).ToList();
             VoteIcons.Show(button, VoteIcons.BoundsOf(button, null), backers);
         }
-
-        StatusLine.Set(
-            room,
-            campfire.Campers.Count > 1 ? StatusLine.Join(session, campfire.Campers, (player, isMe) => Doing(campfire, player, isMe)) : "");
     }
 
     /// <summary>Marks the option as the source of a card screen it opens, like Smith's, so the screens of everyone who chose it link.</summary>
@@ -149,22 +144,6 @@ internal static class CampfireLinks
     private static bool Picked(CampfireSession campfire, PlayerId player, string optionId) =>
         string.Equals(campfire.PendingOf(player), optionId, StringComparison.OrdinalIgnoreCase)
         || campfire.ChosenBy(player).Contains(optionId, StringComparer.OrdinalIgnoreCase);
-
-    private static string Doing(CampfireSession campfire, PlayerId player, bool isMe)
-    {
-        if (campfire.ChosenBy(player) is { Count: > 0 } chosen)
-        {
-            return $"chose {string.Join(" + ", chosen.Select(Describe))}";
-        }
-
-        return campfire.PendingOf(player) is { } pending ? $"{(isMe ? "want" : "wants")} {Describe(pending)}" : "choosing";
-    }
-
-    /// <summary>An option as players know it: the game's HEAL is Rest, and the rest are named as they read.</summary>
-    private static string Describe(string optionId) =>
-        string.Equals(optionId, CampfireOptions.Rest, StringComparison.OrdinalIgnoreCase)
-            ? "Rest"
-            : optionId.Length > 1 ? optionId[..1].ToUpperInvariant() + optionId[1..].ToLowerInvariant() : optionId;
 
     private static void Run()
     {

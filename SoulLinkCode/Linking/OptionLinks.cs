@@ -94,17 +94,4 @@ internal static class OptionLinks
         Session is { } session
         && decision.ViewOptions(session.Me).FirstOrDefault(view => view.Option == key) is { } view
         && view.State is OptionState.Locked or OptionState.GreyedOut or OptionState.NotChosen;
-
-    /// <summary>What a linked player is doing on a table, for the status line: "chose X", "wants X" or "choosing".</summary>
-    public static string Doing(OptionDecision decision, PlayerId player, bool isMe, Func<OptionKey, string> describe, string chose = "chose")
-    {
-        if (decision.CommitOf(player)?.Choice is { } chosen)
-        {
-            return $"{chose} {string.Join(" + ", chosen.Items.Select(describe))}";
-        }
-
-        return decision.VoteOf(player) is { } vote
-            ? $"{(isMe ? "want" : "wants")} {string.Join(" + ", vote.Items.Select(describe))}"
-            : "choosing";
-    }
 }

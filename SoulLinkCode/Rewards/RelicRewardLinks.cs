@@ -131,12 +131,11 @@ internal static class RelicRewardLinks
     /// <summary>Shows who wants each relic reward, and dims relic rewards the local player can't take.</summary>
     public static void Refresh(NRewardsScreen? screen, RewardsSet? set)
     {
-        if (screen is null || !GodotObject.IsInstanceValid(screen) || set is null || OptionLinks.Session is not { } session)
+        if (screen is null || !GodotObject.IsInstanceValid(screen) || set is null || OptionLinks.Session is null)
         {
             return;
         }
 
-        var lines = new List<string>();
         foreach (var reward in set.Rewards.OfType<RelicReward>())
         {
             if (TableId(reward) is not { } table || OptionLinks.DecisionOf(table) is not { } decision
@@ -147,28 +146,6 @@ internal static class RelicRewardLinks
 
             Dim.Set(button, OptionLinks.IsBlocked(decision, OptionKey.Take));
             VoteIcons.Show(button, VoteIcons.BoundsOf(button, null), OptionLinks.Backers(decision, OptionKey.Take), VoteIcons.Placement.Right);
-            if (decision.Participants.Count > 1)
-            {
-                lines.Add("Relic: " + StatusLine.Join(session, decision.Participants, (player, isMe) => Doing(decision, player, isMe)));
-            }
         }
-
-        StatusLine.Set(screen, string.Join("\n", lines));
-    }
-
-    private static string Doing(OptionDecision decision, SoulLink.Core.PlayerId player, bool isMe)
-    {
-        if (decision.CommitOf(player)?.Choice is { } chosen)
-        {
-            return chosen.Contains(OptionKey.Take) ? "took it" : "left it";
-        }
-
-        if (decision.VoteOf(player) is { } vote)
-        {
-            var wants = isMe ? "want" : "wants";
-            return vote.Contains(OptionKey.Take) ? $"{wants} it" : $"{wants} to leave it";
-        }
-
-        return "choosing";
     }
 }

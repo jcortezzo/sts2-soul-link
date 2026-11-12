@@ -2,8 +2,10 @@ using System.Reflection;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.CardSelection;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Cards;
+using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
 using SoulLink.Core;
@@ -106,6 +108,13 @@ internal static class DeckChoices
             ? CardTable.JoinArgs(pickCount, ids.Select(id => new ScreenCard(id!.Value)))
             : OptionTable.JoinArgs(pickCount, Enumerable.Range(1, cards.Count).Select(slot => new DecisionOption(OptionKey.Slot(slot))));
         session.Submit(table, fromDeck ? SyncActions.CardsJoin : SyncActions.OptionsJoin, args);
+        if (!fromDeck)
+        {
+            // Cards offered on the spot are rolled on each player's own machine, so they're shared for slot peek.
+            var slots = cards.Select((card, i) => new KeyValuePair<string, string>(OptionKey.Slot(i + 1).Value, PeekTips.CardValue(card)));
+            session.Submit(table, SyncActions.PeekSet, SyncState.PeekArgs(slots));
+        }
+
         MainFile.Logger.Info($"Soul Link linked the card screen {table}.");
         Schedule();
     }
@@ -154,7 +163,7 @@ internal static class DeckChoices
         Callable.From(Run).CallDeferred();
     }
 
-    /// <summary>Shows who picked which card, dims cards the local player can't pick, and updates the status line.</summary>
+    /// <summary>Shows who picked which card, and dims cards the local player can't pick.</summary>
     public static void Refresh()
     {
         if (_open is not { } open || !GodotObject.IsInstanceValid(open.Screen) || OptionLinks.Session is not { } session)
@@ -186,8 +195,61 @@ internal static class DeckChoices
 
             VoteIcons.Show(holder, VoteIcons.BoundsOf(holder, holder.Hitbox), backers);
         }
+    }
 
-        StatusLine.Set(open.Screen, decision is { Participants.Count: > 1 } ? decision.Status(session) : "");
+    /// <summary>
+    /// Slot peek on a linked card screen: the card each teammate would take for the hovered card, or their card in the
+    /// same slot for cards offered on the spot. Null when the holder isn't on the linked screen.
+    /// </summary>
+    public static IReadOnlyList<IHoverTip>? Peek(NCardHolder holder)
+    {
+        if (_open is not { } open || !GodotObject.IsInstanceValid(open.Screen) || !open.Screen.IsAncestorOf(holder))
+        {
+            return null;
+        }
+
+        if (OptionLinks.Session is not { } session || holder.CardModel is not { } card)
+        {
+            return [];
+        }
+
+        var index = IndexOf(open.Cards, card);
+        if (index < 0)
+        {
+            return [];
+        }
+
+        if (!open.FromDeck)
+        {
+            return PeekTips.SharedCards(session, open.Table, OptionKey.Slot(index + 1), card);
+        }
+
+        if (session.State.Find<CardTable>(open.Table)?.Decision is not { } decision
+            || !decision.IsParticipant(session.Me)
+            || CardIds.IdOf(card) is not { } id)
+        {
+            return [];
+        }
+
+        var tips = new List<IHoverTip>();
+        foreach (var player in decision.Participants.Where(player => player != session.Me))
+        {
+            if (decision.MatchFor(session.Me, Selection.Of(id), player) is not { } match)
+            {
+                tips.Add(PeekTips.About(player, "Has no matching card."));
+                continue;
+            }
+
+            foreach (var theirs in match.Items)
+            {
+                if (OptionLinks.PlayerOf(player) is { } teammate && CardIds.CardOf(teammate, theirs) is { } model)
+                {
+                    tips.AddRange(PeekTips.Card(player, model, card, "Would pick", "from their deck"));
+                }
+            }
+        }
+
+        return tips;
     }
 
     private static int IndexOf(IReadOnlyList<CardModel> cards, CardModel card)
@@ -382,16 +444,6 @@ internal static class DeckChoices
                 }
             }
         }
-
-        /// <summary>What each linked player is doing, like "You: picking     Ben: picked".</summary>
-        public string Status(SoulLinkSession session) =>
-            StatusLine.Join(session, Participants, (player, isMe) =>
-            {
-                var decided = Cards?.HasDecided(player) ?? Slots?.HasDecided(player) ?? false;
-                var voted = (Cards?.VoteOf(player) is not null) || (Slots?.VoteOf(player) is not null)
-                    || (isMe && (Open.Held is not null || Open.Sent is not null));
-                return decided ? "picked" : voted ? (isMe ? "want this" : "has a pick") : "picking";
-            });
 
         private static List<PlayerId> Backers<TAtom>(LinkedChoice<TAtom> decision, PlayerId me, TAtom option, OptionView<TAtom> view)
             where TAtom : notnull

@@ -121,7 +121,7 @@ internal static class ChestLinks
         && OptionLinks.DecisionOf(table) is { } decision
         && OptionLinks.Backers(decision, key).Contains(new PlayerId(playerNetId));
 
-    /// <summary>Re-applies the vote portraits and the status line.</summary>
+    /// <summary>Re-applies the vote portraits.</summary>
     public static void Refresh()
     {
         if (NRun.Instance?.TreasureRoom is not { } room || !GodotObject.IsInstanceValid(room))
@@ -145,16 +145,7 @@ internal static class ChestLinks
 
             RefreshSkipVotes(room);
         }
-
-        StatusLine.Set(
-            room,
-            OptionLinks.Session is { } session && decision is { Participants.Count: > 1 }
-                ? StatusLine.Join(session, decision.Participants, (player, isMe) => OptionLinks.Doing(decision, player, isMe, Describe, "picked"))
-                : "");
     }
-
-    private static string Describe(OptionKey key) =>
-        key == OptionKey.Skip ? "skip" : key.SlotNumber is { } slot ? $"relic {slot}" : key.Value;
 
     private static void Run()
     {

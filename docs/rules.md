@@ -139,7 +139,7 @@ Everyone takes the same option slot, counted in the order each player sees the o
 - **Events:** each page of an event is its own decision, shared by the players on that page. A page with only one option isn't a decision.
 - **Group-vote events:** Battleworn Dummy, Dense Vegetation, Fake Merchant, Jungle Maze Adventure, Morphic Grove, Punch Off, The Lantern Key and War Historian Repy are already a group vote in the game. With everyone agrees they stay the game's vote. With first click, the first vote is cast for everyone, so it's taken at once.
 - **Options that would kill you** can't be taken in co-op, so they count as options you can't take.
-- **Waiting for teammates:** a click on an event page waits until every teammate who's heading to the same page has it open, so nobody's choice is made before they've seen the page. The status line shows who you're waiting for.
+- **Waiting for teammates:** a click on an event page waits until every teammate who's heading to the same page has it open, so nobody's choice is made before they've seen the page. Your portrait sits on the option you clicked while it waits.
 - **Multi-pick screens** like Room Full of Cheese (choose 2 of 8 commons): everyone picks the same set of slots.
 - **Card choices inside an event** (remove, transform, upgrade) follow Deck card actions.
 - **Ancients:** same slot.
@@ -166,8 +166,8 @@ With shared death on, any player's death ends the run for everyone, as in a Pok√
 
 The mod shows what's linked before anyone clicks, so nobody has to count slots or remember links.
 
-- **Slot peek:** hover any slot (card reward, shop item, event option, Ancient choice, chest relic) to see what every other player has in that slot.
-- **Lock indicator:** after someone commits, your matching option is highlighted with their name. Options you can't take are disabled, with the reason.
+- **Slot peek:** hover a slot to see what each teammate has in it, headed with their name and portrait. On card rewards and cards offered on the spot it's their card in the same slot; on deck card screens it's the card they would pick from their deck; in the shop it's their item and what it costs them; at Ancients and events it's their option, when it differs from yours or they can't take it. Chest relics are shared, so there's nothing to peek.
+- **Lock indicator:** after someone commits, their portrait sits on your matching option. Options you can't take are dimmed.
 - **Votes:** each option shows the character portraits of the players who clicked it, like the game's own group votes, on cards, relics and event options alike. With everyone agrees you can see what everyone is waiting for.
 - **Free indicator:** in nice mode, shows when you're not bound and why.
 - **Linked-card view:** with linked cards, cards carry a link badge. Hover one to see its linked cards in every deck, and selection screens highlight your matching card.

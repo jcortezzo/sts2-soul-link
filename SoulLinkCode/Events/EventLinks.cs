@@ -58,6 +58,19 @@ internal static class EventLinks
         }
     }
 
+    /// <summary>A player's event, or null when they aren't in one. Every player's event runs on every machine.</summary>
+    public static EventModel? EventOf(Player player)
+    {
+        try
+        {
+            return Synchronizer?.GetEventForPlayer(player);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or NullReferenceException or KeyNotFoundException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>
     /// Whether the event's current page is a linked decision: not over, a real choice, and not a group vote unless the
     /// first click decides.
@@ -173,9 +186,6 @@ internal static class EventLinks
 
         return awaited;
     }
-
-    /// <summary>A key as the player sees it: "option 2".</summary>
-    public static string Describe(OptionKey key) => key.SlotNumber is { } slot ? $"option {slot}" : key.Value;
 
     /// <summary>
     /// The page an event is on, from its options' text keys, which look like <c>EVENT.pages.PAGE.options.OPTION</c>.

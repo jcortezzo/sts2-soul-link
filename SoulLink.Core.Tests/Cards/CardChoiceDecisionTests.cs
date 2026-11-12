@@ -126,4 +126,22 @@ public class CardChoiceDecisionTests
 
         Assert.Equal(Selection.Of(Card(Ben, 3)), decision.StatusOf(Ben).Binding!.Required);
     }
+
+    [Fact]
+    public void Players_see_the_card_each_teammate_would_take()
+    {
+        var decision = Linked(LinkMode.Nice);
+        decision.Join(Screen(Ana, 12));
+        decision.Join(ScreenWithout(Ben, 10, missing: 3));
+
+        Assert.Equal(Selection.Of(Card(Ben, 4)), decision.MatchFor(Ana, Selection.Of(Card(Ana, 4)), Ben));
+        Assert.Null(decision.MatchFor(Ana, Selection.Of(Card(Ana, 3)), Ben));
+        Assert.Null(decision.MatchFor(Ana, Selection.Of(Card(Ana, 11)), Ben));
+        Assert.Null(decision.MatchFor(Ana, Selection.Of(Card(Ana, 4)), Cal));
+
+        var byIndex = new CardChoiceDecision(new DeckIndexMatching(), LinkMode.Nice);
+        byIndex.Join(Screen(Ana, 12));
+        byIndex.Join(Screen(Ben, 10));
+        Assert.Equal(Selection.Of(Card(Ben, 10)), byIndex.MatchFor(Ana, Selection.Of(Card(Ana, 12)), Ben));
+    }
 }

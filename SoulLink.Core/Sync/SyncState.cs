@@ -11,6 +11,7 @@ public sealed class SyncState
 {
     private readonly Dictionary<string, ISyncTable> _tables = new(StringComparer.Ordinal);
     private readonly HashSet<string> _closed = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Dictionary<PlayerId, IReadOnlyDictionary<string, string>>> _peeks = new(StringComparer.Ordinal);
 
     /// <summary>Raised after each operation is applied, on the host and on clients.</summary>
     public event Action<SyncNotice>? Applied;
@@ -49,6 +50,14 @@ public sealed class SyncState
         ArgumentNullException.ThrowIfNull(settings);
         return [settings.CardMatching.ToString(), settings.Mode.ToString(), SyncArgs.Flag(settings.SharedDeath), settings.WhoDecides.ToString()];
     }
+
+    /// <summary>What each player shared about their options on a table, by player, then by option key.</summary>
+    public IReadOnlyDictionary<PlayerId, IReadOnlyDictionary<string, string>> PeeksOf(string table) =>
+        _peeks.TryGetValue(table, out var peeks) ? peeks : new Dictionary<PlayerId, IReadOnlyDictionary<string, string>>();
+
+    /// <summary>Arguments for <see cref="SyncActions.PeekSet"/>.</summary>
+    public static IReadOnlyList<string> PeekArgs(IEnumerable<KeyValuePair<string, string>> values) =>
+        values.SelectMany(value => new[] { value.Key, value.Value }).ToList();
 
     /// <summary>The open table with this id, if it exists and has this type.</summary>
     public TTable? Find<TTable>(string id)
@@ -103,6 +112,22 @@ public sealed class SyncState
                 var gained = new ArgReader(op.Args);
                 var source = gained.String();
                 Run.Gains.Gain(source, op.Player, gained.Rest().Select(SyncTable.ParseCard).ToList());
+                return [];
+            case SyncActions.PeekSet:
+                var peek = new ArgReader(op.Args);
+                var values = new Dictionary<string, string>(StringComparer.Ordinal);
+                while (peek.HasMore)
+                {
+                    values[peek.String()] = peek.String();
+                }
+
+                if (!_peeks.TryGetValue(op.Table, out var players))
+                {
+                    players = new Dictionary<PlayerId, IReadOnlyDictionary<string, string>>();
+                    _peeks[op.Table] = players;
+                }
+
+                players[op.Player] = values;
                 return [];
         }
 
@@ -185,5 +210,6 @@ public sealed class SyncState
         Run = new SoulLinkRun(settings);
         _tables.Clear();
         _closed.Clear();
+        _peeks.Clear();
     }
 }

@@ -47,6 +47,24 @@ public sealed class CardChoiceDecision : LinkedChoice<CardId>
         return _screens[player];
     }
 
+    /// <summary>
+    /// The cards another player on this choice would take if this player picked these, or null when either of them
+    /// isn't on it yet or the other player has no matching card. Lets players see their teammates' cards before
+    /// anyone commits.
+    /// </summary>
+    public Selection<CardId>? MatchFor(PlayerId player, Selection<CardId> picks, PlayerId other)
+    {
+        ArgumentNullException.ThrowIfNull(picks);
+        if (!_screens.TryGetValue(player, out var screen)
+            || !_screens.TryGetValue(other, out var theirs)
+            || picks.Items.Any(card => !screen.Contains(card)))
+        {
+            return null;
+        }
+
+        return Matching.TryResolve(Matching.Describe(screen, picks), theirs, out var matches) ? matches : null;
+    }
+
     public CommitCheck CanCommit(PlayerId player, CardId card) => CanCommit(player, Selection.Of(card));
 
     public Commit<CardId> Commit(PlayerId player, CardId card) => Commit(player, Selection.Of(card));

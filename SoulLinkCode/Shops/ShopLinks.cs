@@ -2,6 +2,7 @@ using Godot;
 using MegaCrit.Sts2.Core.Entities.Merchant;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Helpers;
+using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Nodes.Screens.Shops;
 using SoulLink.Core;
@@ -104,6 +105,59 @@ internal static class ShopLinks
         }
     }
 
+    /// <summary>
+    /// Slot peek in the shop: each teammate's item in the hovered slot, with their price. Every player's stock is
+    /// known on every machine, so nothing needs sharing.
+    /// </summary>
+    public static IReadOnlyList<IHoverTip> Peek(NMerchantSlot node)
+    {
+        if (OptionLinks.Session is not { } session
+            || Room()?.Room is not { } room
+            || room.GetLocalInventory() is not { } mine
+            || node.Entry is not { } entry
+            || SlotOf(mine, entry) is not { } slot
+            || slot == ShopSlot.CardRemoval)
+        {
+            return [];
+        }
+
+        var tips = new List<IHoverTip>();
+        foreach (var inventory in room.Inventories.Where(inventory => inventory.Player is not null).OrderBy(inventory => inventory.Player.NetId))
+        {
+            var player = OptionLinks.IdOf(inventory.Player);
+            if (player != session.Me)
+            {
+                var theirs = Slots(inventory).Where(item => item.Slot == slot).Select(item => item.Entry).FirstOrDefault();
+                tips.AddRange(Peek(player, theirs, entry));
+            }
+        }
+
+        return tips;
+    }
+
+    private static IEnumerable<IHoverTip> Peek(PlayerId player, MerchantEntry? theirs, MerchantEntry mine)
+    {
+        if (theirs is null)
+        {
+            return [PeekTips.About(player, "Has nothing in this slot.")];
+        }
+
+        if (!theirs.IsStocked)
+        {
+            return [PeekTips.About(player, "This slot is sold out in their shop.")];
+        }
+
+        var price = theirs.EnoughGold ? $"Costs them {theirs.Cost} gold." : $"Costs them {theirs.Cost} gold, more than they have.";
+        return theirs switch
+        {
+            MerchantCardEntry { CreationResult.Card: { } card } =>
+                PeekTips.Card(player, card, (mine as MerchantCardEntry)?.CreationResult?.Card, "Has", "in this slot", price),
+            MerchantRelicEntry { Model: { } relic } => HoverTipFactory.FromRelic(relic).Take(1).Select(tip => PeekTips.Retitled(player, tip, price)),
+            MerchantPotionEntry { Model: { } potion } => [PeekTips.Retitled(player, HoverTipFactory.FromPotion(potion), price)],
+            _ => [],
+        };
+    }
+
     /// <summary>Enters the shop once the local player's stock is ready, with their gold and free potion slots.</summary>
     public static void EnterCurrent()
     {
@@ -170,7 +224,7 @@ internal static class ShopLinks
         Callable.From(Run).CallDeferred();
     }
 
-    /// <summary>Shows who wants or bought each slot, dims slots mean mode greys out, and updates the status line.</summary>
+    /// <summary>Shows who wants or bought each slot, and dims slots mean mode greys out.</summary>
     public static void Refresh()
     {
         if (Room()?.Inventory is not { } rug || !GodotObject.IsInstanceValid(rug))
@@ -180,7 +234,6 @@ internal static class ShopLinks
 
         if (OptionLinks.Session is not { } session || TableId() is not { } table || Shop(table) is not { } shop || rug.Inventory is not { } inventory)
         {
-            StatusLine.Set(rug, "");
             return;
         }
 
@@ -197,10 +250,6 @@ internal static class ShopLinks
                 .ToList();
             VoteIcons.Show(node, VoteIcons.BoundsOf(node, node.Hitbox), backers);
         }
-
-        StatusLine.Set(
-            rug,
-            shop.Shoppers.Count > 1 ? StatusLine.Join(session, shop.Shoppers, (player, isMe) => Doing(shop, player, isMe)) : "");
     }
 
     /// <summary>
@@ -214,16 +263,6 @@ internal static class ShopLinks
             Shop(table) is { } shop
                 ? shop.Purchases.Where(other => other.Slot == purchase.Slot).Select(other => other.Player).Distinct().ToList()
                 : []);
-    }
-
-    private static string Doing(ShopSession shop, PlayerId player, bool isMe)
-    {
-        if (shop.VotesOf(player) is { Count: > 0 } votes)
-        {
-            return $"{(isMe ? "want" : "wants")} {string.Join(", ", votes)}";
-        }
-
-        return shop.Purchases.LastOrDefault(purchase => purchase.Player == player) is { } last ? $"bought {last.Slot}" : "browsing";
     }
 
 

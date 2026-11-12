@@ -1,8 +1,9 @@
 using Godot;
+using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using SoulLink.Core;
 using SoulLink.Core.Decisions;
-using SoulLink.Core.Rewards;
 using SoulLink.SoulLinkCode.Linking;
 using SoulLink.SoulLinkCode.Rewards;
 
@@ -10,8 +11,8 @@ namespace SoulLink.SoulLinkCode.Ui;
 
 /// <summary>
 /// The lock and vote indicators on the card reward screen. Each card shows the portraits of the players who voted for
-/// or took it, cards the local player can't take are dimmed, and a line at the top says what each linked player has
-/// picked so far.
+/// or took it, cards the local player can't take are dimmed, and hovering a card shows each teammate's card in the
+/// same slot.
 /// </summary>
 internal static class LockView
 {
@@ -56,28 +57,35 @@ internal static class LockView
             Dim.Set(holder, blocked);
             VoteIcons.Show(holder, VoteIcons.BoundsOf(holder, holder.Hitbox), OptionLinks.Backers(decision, key));
         }
-
-        StatusLine.Set(
-            screen,
-            decision.Participants.Count > 1 ? StatusLine.Join(session, linked.Participants, (player, isMe) => Doing(linked, player, isMe)) : "");
     }
 
-    private static string Doing(CardRewardScreen screen, PlayerId player, bool isMe)
+    /// <summary>
+    /// Slot peek: each teammate's card in the hovered card's slot. Null when the holder isn't on the card reward
+    /// screen.
+    /// </summary>
+    public static IReadOnlyList<IHoverTip>? Peek(NCardHolder holder)
     {
-        if (screen.Decision.CommitOf(player)?.Choice.Items[0] is { } taken)
+        if (_cardRewardScreen is not { } screen || !GodotObject.IsInstanceValid(screen) || !screen.IsAncestorOf(holder))
         {
-            return taken == CardRewardKeys.Skip ? "skipped"
-                : taken == CardRewardKeys.Sacrifice ? "sacrificed"
-                : $"took {CardRewardLinks.Describe(taken)}";
+            return null;
         }
 
-        if (screen.RerollsOwed(player) > 0)
+        if (OptionLinks.Session is not { } session
+            || CardRewardLinks.ActiveReward is not { } reward
+            || CardRewardLinks.TableId(reward) is not { } table)
         {
-            return "rerolling";
+            return [];
         }
 
-        return screen.Decision.VoteOf(player)?.Items[0] is { } vote
-            ? $"{(isMe ? "want" : "wants")} {CardRewardLinks.Describe(vote)}"
-            : "choosing";
+        var options = RewardAccess.Options(screen);
+        for (var i = 0; i < options.Count; i++)
+        {
+            if (ReferenceEquals(screen.GetCardHolder(options[i].Card), holder))
+            {
+                return PeekTips.SharedCards(session, table, CardRewardLinks.KeyOfCard(options, i), options[i].Card);
+            }
+        }
+
+        return [];
     }
 }

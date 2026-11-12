@@ -377,4 +377,18 @@ public class SyncTests
         Assert.Equal(Ref(Cal, 20), network.Agreed(state => state.Run!.Links.LinkedCard(Ref(Ben, 20), Cal)));
         Assert.Equal(1, network.Agreed(state => state.Run!.Links.GroupOf(Ref(Ben, 20))!.Value.Value));
     }
+
+    [Fact]
+    public void Players_share_what_they_have_in_each_slot_with_every_peer()
+    {
+        var network = new SyncTestNetwork();
+        const string Reward = "f2/rewards-1/card-1";
+
+        network.Send(Reward, Ben, SyncActions.PeekSet, SyncState.PeekArgs([new("slot:1", "CARD|BASH|0"), new("slot:2", "CARD|CLEAVE|1")]));
+        network.Send(Reward, Ben, SyncActions.PeekSet, SyncState.PeekArgs([new("slot:1", "CARD|ANGER|0")]));
+
+        var peeks = network.Agreed(state => state.PeeksOf(Reward)[Ben].OrderBy(entry => entry.Key).Select(entry => $"{entry.Key}={entry.Value}").ToList());
+        Assert.Equal(["slot:1=CARD|ANGER|0"], peeks);
+        Assert.Empty(network.Host.State.PeeksOf("f2/rewards-1/card-2"));
+    }
 }

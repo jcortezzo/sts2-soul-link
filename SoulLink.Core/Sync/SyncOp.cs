@@ -79,6 +79,12 @@ public static class SyncActions
     /// </summary>
     public const string LinksGained = "links.gained";
 
+    /// <summary>
+    /// Shares what the player has in each option of a linked screen, so the others can see it when they hover the same
+    /// option. Replaces what the player shared on that table before. Args: option key and value pairs.
+    /// </summary>
+    public const string PeekSet = "peek.set";
+
     /// <summary>Joins an option decision. Args: pick count, then key and availability pairs.</summary>
     public const string OptionsJoin = "options.join";
 

@@ -30,6 +30,9 @@ internal static class CardRewardLinks
     private static readonly Dictionary<string, int> SetsPerLocation = new(StringComparer.Ordinal);
     private static readonly HashSet<string> Joined = new(StringComparer.Ordinal);
 
+    /// <summary>The cards last shared for slot peek, by table, so an unchanged offer isn't sent again.</summary>
+    private static readonly Dictionary<string, string> Shared = new(StringComparer.Ordinal);
+
     /// <summary>The local player's reward set on the rewards screen.</summary>
     public static RewardsSet? CurrentSet { get; private set; }
 
@@ -41,6 +44,7 @@ internal static class CardRewardLinks
     {
         SetsPerLocation.Clear();
         Joined.Clear();
+        Shared.Clear();
         CurrentSet = null;
         ActiveReward = null;
     }
@@ -154,21 +158,46 @@ internal static class CardRewardLinks
             ? screen
             : null;
 
-    /// <summary>A key as the player sees it: "card 2", "Skip" and so on.</summary>
-    public static string Describe(OptionKey key) =>
-        key.SlotNumber is { } slot ? $"card {slot}"
-        : key == CardRewardKeys.Skip ? "Skip"
-        : key == CardRewardKeys.Sacrifice ? "Sacrifice"
-        : key.IsExtra ? "their extra card"
-        : key.Value;
-
     /// <summary>Reports a reroll with the new offer.</summary>
     public static void ReportReroll(CardReward reward)
     {
         if (SoulLinkSession.Current is { Run: not null } session && TableId(reward) is { } table)
         {
             session.Submit(table, SyncActions.RewardReroll, RewardTable.OfferArgs(OfferOf(reward)));
+            SharePeeks(reward);
         }
+    }
+
+    /// <summary>
+    /// Shares the card in each of the reward's slots, so teammates see it when they hover the same slot. Teammates'
+    /// rewards are rolled on their own machines, so this is the only way to see them.
+    /// </summary>
+    public static void SharePeeks(CardReward reward)
+    {
+        if (SoulLinkSession.Current is not { Run: not null } session || TableId(reward) is not { } table)
+        {
+            return;
+        }
+
+        var options = OptionsOf(reward);
+        var slots = new List<KeyValuePair<string, string>>();
+        for (var i = 0; i < options.Count; i++)
+        {
+            if (options[i].Card is { } card)
+            {
+                slots.Add(new(KeyOfCard(options, i).Value, PeekTips.CardValue(card)));
+            }
+        }
+
+        var args = SyncState.PeekArgs(slots);
+        var text = string.Join("\n", args);
+        if (slots.Count == 0 || (Shared.TryGetValue(table, out var sent) && sent == text))
+        {
+            return;
+        }
+
+        Shared[table] = text;
+        session.Submit(table, SyncActions.PeekSet, args);
     }
 
     public static CardRewardOffer OfferOf(CardReward reward)
@@ -227,5 +256,7 @@ internal static class CardRewardLinks
             op.Sent?.Invoke();
             session.Submit(op.Table, op.Action, op.Args);
         }
+
+        SharePeeks(reward);
     }
 }
