@@ -52,7 +52,7 @@ internal static class EventView
     {
         if (AnimInTweenField(button) is { } tween && tween.IsValid())
         {
-            tween.Finished += Refresh;
+            tween.Finished += () => Views.Refresh("event", Refresh);
         }
         else
         {

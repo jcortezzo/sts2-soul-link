@@ -33,12 +33,13 @@ internal static class EventTrackingPatches
 
     [HarmonyPatch(typeof(NEventOptionButton), nameof(NEventOptionButton.AnimateIn))]
     [HarmonyPostfix]
-    private static void RefreshAfterAnimation(NEventOptionButton __instance) => EventView.AfterAnimateIn(__instance);
+    private static void RefreshAfterAnimation(NEventOptionButton __instance) =>
+        Views.Refresh("event", () => EventView.AfterAnimateIn(__instance));
 
     /// <summary>An Ancient's options fade in once its dialogue ends.</summary>
     [HarmonyPatch(typeof(NAncientEventLayout), "AnimateButtonsIn")]
     [HarmonyPostfix]
-    private static void RefreshAfterDialogue() => EventView.Refresh();
+    private static void RefreshAfterDialogue() => Views.Refresh("event", EventView.Refresh);
 
     /// <summary>Shows teammates' linked votes and choices with the game's own vote portraits.</summary>
     [HarmonyPatch(typeof(NEventOptionButton), "ShouldDisplayPlayerVote")]

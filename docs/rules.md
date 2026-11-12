@@ -133,14 +133,15 @@ The category is linked, and everyone picks their own option within it. With ever
 
 Everyone takes the same option slot, counted in the order each player sees the options. Players often see different options and outcomes in the same slot, and that's expected.
 
-- **Events:** each page of an event is its own decision, shared by the players on that page. A page with only one option isn't a decision. Events the game already puts to a group vote stay as they are: Battleworn Dummy, Dense Vegetation, Fake Merchant, Jungle Maze Adventure, Morphic Grove, Punch Off, The Lantern Key and War Historian Repy.
+- **Events:** each page of an event is its own decision, shared by the players on that page. A page with only one option isn't a decision.
+- **Group-vote events:** Battleworn Dummy, Dense Vegetation, Fake Merchant, Jungle Maze Adventure, Morphic Grove, Punch Off, The Lantern Key and War Historian Repy are already a group vote in the game. With everyone agrees they stay the game's vote. With first click, the first vote is cast for everyone, so it's taken at once.
 - **Options that would kill you** can't be taken in co-op, so they count as options you can't take.
 - **Waiting for teammates:** a click on an event page waits until every teammate who's heading to the same page has it open, so nobody's choice is made before they've seen the page. The status line shows who you're waiting for.
 - **Multi-pick screens** like Room Full of Cheese (choose 2 of 8 commons): everyone picks the same set of slots.
 - **Card choices inside an event** (remove, transform, upgrade) follow Deck card actions.
 - **Ancients:** same slot.
-- **Relic rewards after fights:** taking or skipping is linked.
-- **Treasure chests:** same slot, and this is intended. Co-op chests hold [one relic per player in a shared pool](https://slaythespire-2.com/blog/20260403-co-op), so everyone goes for the same relic. The game's rock-paper-scissors decides who gets it, and the others get what's left.
+- **Relic rewards after fights:** taking or skipping is linked. Leaving the rewards screen skips any relic reward you didn't take, as it does for card rewards.
+- **Treasure chests:** same slot, and this is intended. Co-op chests hold [one relic per player in a shared pool](https://slaythespire-2.com/blog/20260403-co-op), so everyone goes for the same relic. The game's rock-paper-scissors decides who gets it, and the others get what's left. Skipping is linked too, and skipping leaves the chest as usual.
 
 ## Not linked
 
@@ -164,7 +165,7 @@ The mod shows what's linked before anyone clicks, so nobody has to count slots o
 
 - **Slot peek:** hover any slot (card reward, shop item, event option, Ancient choice, chest relic) to see what every other player has in that slot.
 - **Lock indicator:** after someone commits, your matching option is highlighted with their name. Options you can't take are disabled, with the reason.
-- **Votes:** with everyone agrees, each option shows who has clicked it, so you can see what everyone is waiting for.
+- **Votes:** each option shows the character portraits of the players who clicked it, like the game's own group votes, on cards, relics and event options alike. With everyone agrees you can see what everyone is waiting for.
 - **Free indicator:** in nice mode, shows when you're not bound and why.
 - **Linked-card view:** with linked cards, cards carry a link badge. Hover one to see its linked cards in every deck, and selection screens highlight your matching card.
 - **Index view:** with deck index, selection screens number the cards.

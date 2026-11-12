@@ -1,7 +1,9 @@
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Runs;
+using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
+using SoulLink.SoulLinkCode.Linking;
 using SoulLink.SoulLinkCode.Rewards;
 
 namespace SoulLink.SoulLinkCode.Patches;
@@ -30,9 +32,12 @@ internal static class RunLifecyclePatches
     /// <summary>Forgets every screen's tracking from the last run.</summary>
     private static void ResetScreens()
     {
+        OptionLinks.Reset();
         CardRewardLinks.Reset();
         CardRewardExecutor.Reset();
+        RelicRewardLinks.Reset();
         EventLinks.Reset();
         EventExecutor.Reset();
+        ChestLinks.Reset();
     }
 }

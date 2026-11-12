@@ -3,19 +3,19 @@ using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using SoulLink.Core;
 using SoulLink.Core.Decisions;
 using SoulLink.Core.Rewards;
+using SoulLink.SoulLinkCode.Linking;
 using SoulLink.SoulLinkCode.Rewards;
 
 namespace SoulLink.SoulLinkCode.Ui;
 
 /// <summary>
-/// The lock and vote indicators on the card reward screen. Options the local player can't take are dimmed, their own
-/// vote and the others' votes are tinted, and a line at the top says what each linked player has picked so far.
+/// The lock and vote indicators on the card reward screen. Each card shows the portraits of the players who voted for
+/// or took it, cards the local player can't take are dimmed, and a line at the top says what each linked player has
+/// picked so far.
 /// </summary>
 internal static class LockView
 {
     private static readonly Color Dimmed = new(1f, 1f, 1f, 0.35f);
-    private static readonly Color MyVote = new(0.7f, 1f, 0.7f);
-    private static readonly Color TheirVote = new(0.75f, 0.85f, 1f);
 
     private static NCardRewardSelectionScreen? _cardRewardScreen;
 
@@ -44,7 +44,6 @@ internal static class LockView
 
         var decision = linked.Decision;
         var views = decision.ViewOptions(session.Me).ToDictionary(view => view.Option);
-        var myVote = decision.VoteOf(session.Me);
         var options = RewardAccess.Options(screen);
         for (var i = 0; i < options.Count; i++)
         {
@@ -56,10 +55,8 @@ internal static class LockView
             var key = CardRewardLinks.KeyOfCard(options, i);
             var blocked = views.TryGetValue(key, out var view)
                 && view.State is OptionState.Locked or OptionState.GreyedOut or OptionState.Unavailable or OptionState.NotChosen;
-            holder.Modulate = blocked ? Dimmed
-                : myVote?.Contains(key) == true ? MyVote
-                : decision.VotersFor(session.Me, key).Count > 0 ? TheirVote
-                : Colors.White;
+            holder.Modulate = blocked ? Dimmed : Colors.White;
+            VoteIcons.Show(holder, VoteIcons.BoundsOf(holder, holder.Hitbox), OptionLinks.Backers(decision, key));
         }
 
         StatusLine.Set(

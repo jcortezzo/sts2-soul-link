@@ -5,11 +5,14 @@ using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
+using MegaCrit.Sts2.Core.Nodes.Rewards;
 using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Rewards;
 using MegaCrit.Sts2.Core.Runs;
+using SoulLink.Core.Decisions;
 using SoulLink.Core.Rewards;
+using SoulLink.SoulLinkCode.Linking;
 using SoulLink.SoulLinkCode.Ui;
 
 namespace SoulLink.SoulLinkCode.Rewards;
@@ -50,7 +53,7 @@ internal static class CardRewardTrackingPatches
             return;
         }
 
-        LockView.Show(__result);
+        Views.Refresh("card reward", () => LockView.Show(__result));
         __result.TreeExited += CardRewardExecutor.Schedule;
         CardRewardExecutor.Schedule();
     }
@@ -58,7 +61,7 @@ internal static class CardRewardTrackingPatches
     /// <summary>The screen rebuilds its cards when it opens and after a reroll, so the indicator has to be reapplied.</summary>
     [HarmonyPatch(typeof(NCardRewardSelectionScreen), nameof(NCardRewardSelectionScreen.RefreshOptions))]
     [HarmonyPostfix]
-    private static void RefreshIndicator() => LockView.Refresh();
+    private static void RefreshIndicator() => Views.Refresh("card reward", LockView.Refresh);
 
     /// <summary>
     /// Reroll replaces the reward's cards before it returns, so the new offer can be reported. Other players who can
@@ -177,6 +180,8 @@ internal static class CardRewardGatePatches
             ops.Add(CardRewardLinks.Choose(table, CardRewardKeys.Skip));
         }
 
+        ops.AddRange(RelicRewardLinks.SkipOps(set));
+
         if (ops.Count == 0 && CardRewardExecutor.IsDone(set))
         {
             return true;
@@ -194,6 +199,31 @@ internal static class CardRewardGatePatches
             });
         }
 
+        return false;
+    }
+
+    /// <summary>
+    /// Claiming a relic reward is linked: the click is a vote to take it, or takes it for everyone with first click.
+    /// Other rewards are claimed as usual.
+    /// </summary>
+    [HarmonyPatch(typeof(NRewardButton), "GetReward")]
+    [HarmonyPrefix]
+    private static bool GateRelicReward(NRewardButton __instance, ref Task __result)
+    {
+        if (ClickGate.TryConsumeApproval(__instance)
+            || __instance.Reward is not RelicReward reward
+            || !LocalContext.IsMe(reward.Player)
+            || SoulLinkSession.Current is not { Run: not null }
+            || RelicRewardLinks.TableId(reward) is not { } table
+            || RelicRewardLinks.TakeCommittedClick(table))
+        {
+            return true;
+        }
+
+        // Clicking a relic means the player isn't leaving yet.
+        CardRewardExecutor.CancelProceed();
+        ClickGate.Request([.. RelicRewardLinks.JoinOps(reward), OptionLinks.Choose(table, OptionKey.Take)]);
+        __result = Task.CompletedTask;
         return false;
     }
 

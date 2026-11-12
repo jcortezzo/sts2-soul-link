@@ -34,6 +34,9 @@ internal static class CardRewardExecutor
     private static bool _scheduled;
     private static bool _retrying;
 
+    /// <summary>The local player's rewards screen, while it's open.</summary>
+    public static NRewardsScreen? RewardsScreen => _rewardsScreen is { } screen && GodotObject.IsInstanceValid(screen) ? screen : null;
+
     /// <summary>Forgets everything from the last run.</summary>
     public static void Reset()
     {
@@ -71,14 +74,19 @@ internal static class CardRewardExecutor
     }
 
     /// <summary>
-    /// Whether the player can leave the rewards screen: every card reward in the set was taken or is decided as a
-    /// skip. Card rewards that aren't linked don't hold the player up.
+    /// Whether the player can leave the rewards screen: every card and relic reward in the set was taken or is decided
+    /// as a skip. Rewards that aren't linked don't hold the player up.
     /// </summary>
     public static bool IsDone(RewardsSet set)
     {
         if (SoulLinkSession.Current is not { } session)
         {
             return true;
+        }
+
+        if (!RelicRewardLinks.IsDone(set))
+        {
+            return false;
         }
 
         foreach (var reward in set.Rewards.OfType<CardReward>())
@@ -219,6 +227,7 @@ internal static class CardRewardExecutor
             }
         }
 
+        RelicRewardLinks.Pump(RewardsScreen, set);
         if (_pendingProceed is { } proceed && openReward is null && _opening is null && IsDone(set))
         {
             _pendingProceed = null;

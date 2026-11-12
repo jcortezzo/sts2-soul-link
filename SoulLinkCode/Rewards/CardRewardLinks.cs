@@ -72,6 +72,8 @@ internal static class CardRewardLinks
         {
             Join(reward);
         }
+
+        RelicRewardLinks.JoinAll(set);
     }
 
     /// <summary>Records the local player's open card reward and joins its linked screen.</summary>
@@ -87,16 +89,17 @@ internal static class CardRewardLinks
     }
 
     /// <summary>The linked table for a card reward, or null when it isn't part of a known reward set.</summary>
-    public static string? TableId(CardReward reward)
-    {
-        var set = CurrentSet;
-        if (set is null || !SetNumbers.TryGetValue(set, out var setNumber) || !set.Rewards.Contains(reward))
-        {
-            return null;
-        }
+    public static string? TableId(CardReward reward) =>
+        CurrentSet is { } set && set.Rewards.Contains(reward) && SetPrefix(set) is { } prefix
+            ? $"{prefix}/card-{ScreenNumber(set, reward)}"
+            : null;
 
-        return $"{LocationOf(set)}/rewards-{setNumber.Value}/card-{ScreenNumber(set, reward)}";
-    }
+    /// <summary>
+    /// The start of the table ids for a reward set's linked rewards: the room and the set's number in it, the same on
+    /// every peer. Null for a set that isn't the local player's current one.
+    /// </summary>
+    public static string? SetPrefix(RewardsSet set) =>
+        ReferenceEquals(set, CurrentSet) && SetNumbers.TryGetValue(set, out var number) ? $"{LocationOf(set)}/rewards-{number.Value}" : null;
 
     /// <summary>Joins the reward's linked screen once, with what it offers.</summary>
     public static IReadOnlyList<GatedOp> JoinOps(CardReward reward)

@@ -1,3 +1,4 @@
+using HarmonyLib;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Events;
@@ -6,7 +7,7 @@ using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Runs;
 using SoulLink.Core;
 using SoulLink.Core.Decisions;
-using SoulLink.Core.Sync;
+using SoulLink.SoulLinkCode.Linking;
 using SoulLink.SoulLinkCode.Ui;
 
 namespace SoulLink.SoulLinkCode.Events;
@@ -17,13 +18,16 @@ namespace SoulLink.SoulLinkCode.Events;
 /// share it. Options are matched by slot, counted in the order each player sees them.
 /// </summary>
 /// <remarks>
-/// Events the game puts to a group vote are left to the game. A page with a single option isn't a decision, so it
-/// isn't linked.
+/// Events the game puts to a group vote are left to the game's vote, except with first click, where the first click
+/// casts the same vote for everyone. A page with a single option isn't a decision, so it isn't linked.
 /// </remarks>
 internal static class EventLinks
 {
     private const string PagesMarker = ".pages.";
     private const string OptionsMarker = ".options.";
+
+    private static readonly AccessTools.FieldRef<EventSynchronizer, uint> GroupPageField =
+        AccessTools.FieldRefAccess<EventSynchronizer, uint>("_pageIndex");
 
     /// <summary>How many options each player has chosen per page in each room, keyed by room, player and page.</summary>
     private static readonly Dictionary<string, int> Choices = new(StringComparer.Ordinal);
@@ -31,14 +35,11 @@ internal static class EventLinks
     /// <summary>How many options each player has chosen in each room, keyed by room and player.</summary>
     private static readonly Dictionary<string, int> RoomChoices = new(StringComparer.Ordinal);
 
-    private static readonly HashSet<string> Joined = new(StringComparer.Ordinal);
-
     /// <summary>Forgets everything from the last run.</summary>
     public static void Reset()
     {
         Choices.Clear();
         RoomChoices.Clear();
-        Joined.Clear();
     }
 
     public static EventSynchronizer? Synchronizer => RunManager.Instance?.EventSynchronizer;
@@ -57,8 +58,12 @@ internal static class EventLinks
         }
     }
 
-    /// <summary>Whether the event's current page is a linked decision: not a group vote, not over, and a real choice.</summary>
-    public static bool IsLinked(EventModel ev) => ev.Owner is not null && !ev.IsShared && !ev.IsFinished && ev.CurrentOptions.Count >= 2;
+    /// <summary>
+    /// Whether the event's current page is a linked decision: not over, a real choice, and not a group vote unless the
+    /// first click decides.
+    /// </summary>
+    public static bool IsLinked(EventModel ev) =>
+        ev.Owner is not null && !ev.IsFinished && ev.CurrentOptions.Count >= 2 && (!ev.IsShared || IsFirstClick);
 
     /// <summary>The linked table for the event's current page.</summary>
     public static string? TableId(EventModel ev)
@@ -69,6 +74,12 @@ internal static class EventLinks
         }
 
         var page = PageOf(ev);
+        if (ev.IsShared)
+        {
+            // Everyone is on the same page of a group vote, and the game numbers its pages.
+            return Synchronizer is { } synchronizer ? $"{RoomOf(owner)}/group-event/{page}/{GroupPageField(synchronizer) + 1}" : null;
+        }
+
         return $"{RoomOf(owner)}/event/{page}/{Choices.GetValueOrDefault(ChoiceKey(owner, page)) + 1}";
     }
 
@@ -110,43 +121,23 @@ internal static class EventLinks
         !option.IsLocked && !(ev.Owner is { } owner && option.WillKillPlayer?.Invoke(owner) == true);
 
     /// <summary>Joins the local player's current page once, with what it offers.</summary>
-    public static IReadOnlyList<GatedOp> JoinOps(EventModel ev)
-    {
-        if (!IsLinked(ev) || TableId(ev) is not { } table || Joined.Contains(table))
-        {
-            return [];
-        }
-
-        return [new GatedOp(table, SyncActions.OptionsJoin, OptionTable.JoinArgs(1, OptionsOf(ev)), Sent: () => Joined.Add(table))];
-    }
+    public static IReadOnlyList<GatedOp> JoinOps(EventModel ev) =>
+        IsLinked(ev) && TableId(ev) is { } table ? OptionLinks.JoinOps(table, OptionsOf(ev)) : [];
 
     /// <summary>Joins the local player's current page, if it's linked, so mean mode knows their options before anyone picks.</summary>
     public static void JoinCurrent()
     {
-        if (SoulLinkSession.Current is not { Run: not null } session || LocalEvent() is not { } ev)
+        if (OptionLinks.Session is not null && LocalEvent() is { } ev)
         {
-            return;
-        }
-
-        foreach (var op in JoinOps(ev))
-        {
-            op.Sent?.Invoke();
-            session.Submit(op.Table, op.Action, op.Args);
+            OptionLinks.Submit(JoinOps(ev));
         }
     }
 
     /// <summary>The operation for a click on an option, checked against the local linked state.</summary>
-    public static GatedOp Choose(string table, OptionKey key) =>
-        new(table, SyncActions.OptionsChoose, [key.Value], state =>
-            state.Find<OptionTable>(table)?.Decision.CanCommit(SoulLinkSession.Current?.Me ?? default, key));
+    public static GatedOp Choose(string table, OptionKey key) => OptionLinks.Choose(table, key);
 
     /// <summary>The page's linked decision, once the local player has joined it.</summary>
-    public static OptionDecision? DecisionOf(string table) =>
-        SoulLinkSession.Current is { } session
-        && session.State.Find<OptionTable>(table)?.Decision is { } decision
-        && decision.IsParticipant(session.Me)
-            ? decision
-            : null;
+    public static OptionDecision? DecisionOf(string table) => OptionLinks.DecisionOf(table);
 
     /// <summary>
     /// The other players a first click on the local player's page waits for: players on the same page who haven't
@@ -155,7 +146,8 @@ internal static class EventLinks
     /// </summary>
     public static IReadOnlyList<PlayerId> Awaited(EventModel mine)
     {
-        if (Synchronizer is not { } synchronizer || mine.Owner is not { } me || TableId(mine) is not { } table)
+        // A group vote's page is the same for everyone, and players who join late follow the first click.
+        if (mine.IsShared || Synchronizer is not { } synchronizer || mine.Owner is not { } me || TableId(mine) is not { } table)
         {
             return [];
         }
@@ -214,6 +206,8 @@ internal static class EventLinks
 
         return "PAGE";
     }
+
+    private static bool IsFirstClick => OptionLinks.Session?.Run?.Settings.WhoDecides == WhoDecides.FirstClick;
 
     private static string RoomOf(Player player) => player.RunState.RunLocation.ToString();
 

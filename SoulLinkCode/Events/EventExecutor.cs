@@ -104,13 +104,12 @@ internal static class EventExecutor
         try
         {
             Pump();
+            EventView.Refresh();
         }
         catch (Exception ex)
         {
             MainFile.Logger.Error($"Soul Link couldn't do a linked event choice: {ex}");
         }
-
-        EventView.Refresh();
     }
 
     /// <summary>Checks a waiting click again shortly, so it's sent once its time limit passes even if nothing else changes.</summary>
