@@ -82,7 +82,7 @@ When several players choose a card from their deck for the same action, the firs
 
 The players in the action are the ones doing that same action at that moment: everyone who Smiths at a campfire, everyone who bought card removal, everyone who took the same event option. For multi-card picks (choose 2), the whole set must match.
 
-You pick on the game's own card screen as usual. With everyone agrees, confirming your pick is your vote, and the screen stays open until everyone's picks agree, so you can still change it; with first click, the first confirmed pick decides. Confirming waits a few seconds for teammates whose screens haven't opened yet. Cards offered on the spot rather than from your deck, like Room Full of Cheese's commons, match by slot instead.
+You pick on the game's own card screen as usual. With everyone agrees, confirming your pick is your vote: you're taken back to the cards, with your portrait on the one you picked and your teammates' portraits on theirs, and the screen stays open until everyone's picks agree, so you can still change it. With first click, the first confirmed pick decides. Confirming waits a few seconds for teammates whose screens haven't opened yet, and a screen that can't join the linked choice is left for you to pick freely. Cards offered on the spot rather than from your deck, like Room Full of Cheese's commons, match by slot instead.
 
 ### Linked cards
 

@@ -181,6 +181,7 @@ internal sealed class SoulLinkSession
         }
         else if (outcome.Rejection is { } rejection)
         {
+            MainFile.Logger.Info($"Soul Link refused {op} from {NameOf(sender)}: {rejection.Reason}");
             CustomMessageWrapper.Send(new SoulLinkRejectionMessage { Rejection = rejection }, _net);
         }
     }
@@ -213,6 +214,11 @@ internal sealed class SoulLinkSession
 
     private void OnApplied(SyncNotice notice)
     {
+        if (notice.Op.Action == SyncActions.RunStart && Run is { } run)
+        {
+            MainFile.Logger.Info($"Soul Link rules for this run: {run.Settings}");
+        }
+
         if (_replica is not null && notice.Op.Player == Me)
         {
             TakePending(notice.Op)?.Invoke(true);

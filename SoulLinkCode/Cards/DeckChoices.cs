@@ -6,6 +6,7 @@ using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
+using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
 using SoulLink.Core;
@@ -34,6 +35,12 @@ internal static class DeckChoices
 
     /// <summary>How long a pick waits for teammates' screens to open before it's sent anyway.</summary>
     private const ulong HoldLimitMsec = 8000;
+
+    /// <summary>
+    /// How long a screen may go without being part of its linked choice before it's left to the player, in case its
+    /// join never reached the host.
+    /// </summary>
+    private const ulong JoinLimitMsec = 5000;
 
     private static readonly AccessTools.FieldRef<NCardGridSelectionScreen, IReadOnlyList<CardModel>?> CardsField =
         AccessTools.FieldRefAccess<NCardGridSelectionScreen, IReadOnlyList<CardModel>?>("_cards");
@@ -103,11 +110,18 @@ internal static class DeckChoices
         var number = ScreensPerContext[context.Key] = ScreensPerContext.GetValueOrDefault(context.Key) + 1;
         var table = $"{context.Key}/cards-{number}";
         var pickCount = Math.Max(1, PrefsOf(screen)?.MaxSelect ?? 1);
-        _open = new OpenScreen(screen, table, fromDeck, pickCount, cards, context.SameChoice);
+        _open = new OpenScreen(screen, table, fromDeck, pickCount, cards, context.SameChoice, Time.GetTicksMsec());
+        MainFile.Logger.Info($"Soul Link linked the card screen {table}: {cards.Count} {(fromDeck ? "deck" : "offered")} card(s), pick {pickCount}.");
         var args = fromDeck
             ? CardTable.JoinArgs(pickCount, ids.Select(id => new ScreenCard(id!.Value)))
             : OptionTable.JoinArgs(pickCount, Enumerable.Range(1, cards.Count).Select(slot => new DecisionOption(OptionKey.Slot(slot))));
-        session.Submit(table, fromDeck ? SyncActions.CardsJoin : SyncActions.OptionsJoin, args);
+        session.Submit(table, fromDeck ? SyncActions.CardsJoin : SyncActions.OptionsJoin, args, accepted =>
+        {
+            if (!accepted)
+            {
+                Unlink(screen, null, "the host refused to add it to the linked choice");
+            }
+        });
         if (!fromDeck)
         {
             // Cards offered on the spot are rolled on each player's own machine, so they're shared for slot peek.
@@ -115,7 +129,11 @@ internal static class DeckChoices
             session.Submit(table, SyncActions.PeekSet, SyncState.PeekArgs(slots));
         }
 
-        MainFile.Logger.Info($"Soul Link linked the card screen {table}.");
+        if (Engine.GetMainLoop() is SceneTree tree)
+        {
+            tree.CreateTimer(JoinLimitMsec / 1000.0 + 0.5).Timeout += Schedule;
+        }
+
         Schedule();
     }
 
@@ -139,16 +157,35 @@ internal static class DeckChoices
             return;
         }
 
-        // Confirming the pick that's already the player's vote keeps it, rather than taking it back.
-        if (open.Sent is { } sent && sent.Count == picked.Count && sent.All(card => picked.Contains(card)))
+        // Confirming the pick that's already the player's vote, or on its way, keeps it rather than taking it back.
+        if (SameCards(open.Sent, picked) || SameCards(open.Sending, picked) || SameCards(open.Held?.Cards, picked))
         {
             return;
         }
 
-        var held = new HeldPick(picked, Time.GetTicksMsec());
-        _open = open with { Held = held };
+        // The wait for teammates' screens counts from the first confirm, so confirming again doesn't restart it.
+        var since = open.HoldStarted ?? Time.GetTicksMsec();
+        _open = open with { Held = new HeldPick(picked, since), HoldStarted = since };
         Pump();
         Views.Refresh("card choice", Refresh);
+        Callable.From(() => BackToCards(screen)).CallDeferred();
+    }
+
+    /// <summary>
+    /// Takes the player from their pick's preview back to the cards, as the preview's back button does, while the
+    /// pick waits for teammates: their portrait shows on the card they picked and teammates' portraits on theirs, and
+    /// they can still pick another. Screens without a preview stay as they are.
+    /// </summary>
+    private static void BackToCards(NCardGridSelectionScreen screen)
+    {
+        if (_open is not { } open || !ReferenceEquals(open.Screen, screen) || !GodotObject.IsInstanceValid(screen)
+            || AccessTools.Method(screen.GetType(), "CancelSelection", [typeof(NButton)]) is not { } back)
+        {
+            return;
+        }
+
+        back.Invoke(screen, [null]);
+        Refresh();
     }
 
     /// <summary>Checks for picks to send or finish after the linked state changed. Once per frame at most.</summary>
@@ -183,7 +220,7 @@ internal static class DeckChoices
             var view = decision?.Views.FirstOrDefault(entry => entry.Card == card);
             Dim.Set(holder, view?.State is OptionState.Locked or OptionState.GreyedOut or OptionState.NotChosen);
             var backers = new List<PlayerId>();
-            if (open.Held?.Cards.Contains(card) == true)
+            if (open.Held?.Cards.Contains(card) == true || open.Sending?.Contains(card) == true)
             {
                 backers.Add(session.Me);
             }
@@ -295,11 +332,19 @@ internal static class DeckChoices
             return;
         }
 
-        if (Decision(open) is { } decision && decision.CommittedCards is { } committed)
+        var decision = Decision(open);
+        if (decision?.CommittedCards is { } committed)
         {
             _open = null;
             MainFile.Logger.Info($"Soul Link picked {committed.Count} card(s) on {open.Table}.");
             Finish(open.Screen, committed);
+            return;
+        }
+
+        // A screen that never became part of its linked choice can't be decided there, so it's left to the player.
+        if (decision is null && Time.GetTicksMsec() - open.OpenedAt > JoinLimitMsec)
+        {
+            Unlink(open.Screen, null, "it never became part of the linked choice");
             return;
         }
 
@@ -308,23 +353,85 @@ internal static class DeckChoices
             return;
         }
 
-        var joined = Decision(open)?.Participants ?? [];
+        var joined = decision?.Participants ?? [];
         var awaited = open.SameChoice().Where(player => player != session.Me && !joined.Contains(player)).ToList();
-        if (awaited.Count > 0 && Time.GetTicksMsec() - held.Since < HoldLimitMsec)
+        if ((awaited.Count > 0 && Time.GetTicksMsec() - held.Since < HoldLimitMsec) || ClickGate.IsBusy)
         {
+            // Waiting for teammates' screens, or for the host to answer an earlier click, which would drop this one.
             CheckHeldLater();
             return;
         }
 
-        _open = open with { Held = null, Sent = held.Cards };
+        _open = open with { Held = null, Sending = held.Cards };
+        MainFile.Logger.Info($"Soul Link sent a pick of {held.Cards.Count} card(s) on {open.Table}.");
         var op = open.FromDeck
             ? new GatedOp(open.Table, SyncActions.CardsChoose, held.Cards.Select(card => SyncArgs.Number(CardIds.IdOf(card)!.Value.Value)).ToList(), state =>
                 state.Find<CardTable>(open.Table)?.Decision is { } cards && cards.IsParticipant(session.Me)
                     ? cards.CanCommit(session.Me, new Selection<CardId>(held.Cards.Select(card => CardIds.IdOf(card)!.Value)))
                     : null)
             : OptionLinks.Choose(open.Table, held.Cards.Select(card => OptionKey.Slot(IndexOf(open.Cards, card) + 1)).ToArray());
-        ClickGate.Request([op]);
+        ClickGate.Request([op], accepted => Answered(open.Screen, held.Cards, accepted));
     }
+
+    /// <summary>
+    /// The host's answer to a pick. A refused pick can be made again; one refused because the screen isn't part of the
+    /// linked choice is the player's own, so the screen finishes with it.
+    /// </summary>
+    private static void Answered(NCardGridSelectionScreen screen, IReadOnlyList<CardModel> pick, bool accepted)
+    {
+        if (_open is not { } open || !ReferenceEquals(open.Screen, screen))
+        {
+            return;
+        }
+
+        if (accepted)
+        {
+            _open = open with { Sending = null, Sent = pick };
+            return;
+        }
+
+        _open = open with { Sending = null, Sent = null };
+        if (Decision(open) is null)
+        {
+            Unlink(screen, pick, "its pick was refused and it isn't part of the linked choice");
+            return;
+        }
+
+        MainFile.Logger.Info($"Soul Link's pick on {open.Table} wasn't taken, so it can be picked again.");
+        Views.Refresh("card choice", Refresh);
+    }
+
+    /// <summary>
+    /// Stops linking a screen that can't be decided in its linked choice, so the player isn't stuck: it finishes with
+    /// the pick they already confirmed, or waits for them to pick as usual.
+    /// </summary>
+    private static void Unlink(NCardGridSelectionScreen screen, IReadOnlyList<CardModel>? pick, string reason)
+    {
+        if (_open is not { } open || !ReferenceEquals(open.Screen, screen))
+        {
+            return;
+        }
+
+        _open = null;
+        MainFile.Logger.Warn($"Soul Link unlinked the card screen {open.Table}: {reason}. The pick there is the player's own.");
+        var grid = GridField(screen);
+        foreach (var card in open.Cards)
+        {
+            if (grid?.GetCardHolder(card) is { } holder && GodotObject.IsInstanceValid(holder))
+            {
+                Dim.Set(holder, false);
+                VoteIcons.Clear(holder);
+            }
+        }
+
+        if ((pick ?? open.Held?.Cards ?? open.Sending) is { Count: > 0 } confirmed)
+        {
+            Finish(screen, confirmed);
+        }
+    }
+
+    private static bool SameCards(IReadOnlyList<CardModel>? cards, IReadOnlyList<CardModel> picked) =>
+        cards is not null && cards.Count == picked.Count && cards.All(card => picked.Contains(card));
 
     private static void CheckHeldLater()
     {
@@ -385,6 +492,11 @@ internal static class DeckChoices
     private sealed record HeldPick(IReadOnlyList<CardModel> Cards, ulong Since);
 
     /// <summary>The local player's linked card screen.</summary>
+    /// <param name="OpenedAt">When it opened, in engine ticks.</param>
+    /// <param name="Held">A confirmed pick waiting for teammates' screens.</param>
+    /// <param name="HoldStarted">When the player first confirmed a pick, in engine ticks.</param>
+    /// <param name="Sending">A pick on its way to the host.</param>
+    /// <param name="Sent">The pick the host took as the player's vote or choice.</param>
     private sealed record OpenScreen(
         NCardGridSelectionScreen Screen,
         string Table,
@@ -392,7 +504,10 @@ internal static class DeckChoices
         int PickCount,
         IReadOnlyList<CardModel> Cards,
         Func<IReadOnlyList<PlayerId>> SameChoice,
+        ulong OpenedAt,
         HeldPick? Held = null,
+        ulong? HoldStarted = null,
+        IReadOnlyList<CardModel>? Sending = null,
         IReadOnlyList<CardModel>? Sent = null);
 
     /// <summary>How one card looks on the local player's screen: its state, and who picked it or holds them to it.</summary>

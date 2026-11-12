@@ -45,6 +45,9 @@ internal static class ClickGate
     public static bool SettingsPending =>
         SoulLinkSession.Current is { Run: null } session && Time.GetTicksMsec() - session.StartedAtMsec < SettingsLimitMsec;
 
+    /// <summary>True while an earlier click is still waiting for the host's answer, so a new one would be dropped.</summary>
+    public static bool IsBusy => _waiting && Time.GetTicksMsec() - _waitingSince < WaitLimitMsec;
+
     /// <summary>True when the mod itself is doing this click, so the patch should let it through.</summary>
     public static bool TryConsumeApproval(object owner)
     {
@@ -75,7 +78,8 @@ internal static class ClickGate
     /// Decides whether the game may act on a click now. Returns true outside linked runs or when there's nothing to
     /// send. Otherwise the game's own action is skipped and the operations go to the host, unless the local copy of
     /// the linked state already refuses them; <paramref name="answered"/> then runs with whether everything was
-    /// accepted.
+    /// accepted. A click that comes while an earlier one is still waiting for the host is dropped, and counts as
+    /// refused.
     /// </summary>
     public static bool Request(IReadOnlyList<GatedOp> ops, Action<bool>? answered = null)
     {
@@ -85,8 +89,9 @@ internal static class ClickGate
             return true;
         }
 
-        if (_waiting && Time.GetTicksMsec() - _waitingSince < WaitLimitMsec)
+        if (IsBusy)
         {
+            answered?.Invoke(false);
             return false;
         }
 

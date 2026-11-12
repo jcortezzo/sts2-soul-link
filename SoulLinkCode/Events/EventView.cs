@@ -2,6 +2,7 @@ using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Events;
 using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Localization;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Events;
 using SoulLink.Core;
@@ -135,6 +136,11 @@ internal static class EventView
             var available = EventLinks.IsAvailable(ev, theirs);
             if (!Same(mine, theirs))
             {
+                // The game adds the event's numbers to an option's text when it shows the option, so do the same.
+                foreach (var text in new[] { theirs.Title, theirs.Description }.OfType<LocString>())
+                {
+                    ev.DynamicVars.AddTo(text);
+                }
                 var description = PeekTips.Text(theirs.Description) ?? "";
                 if (!available)
                 {
@@ -152,11 +158,9 @@ internal static class EventView
         return tips;
     }
 
+    /// <summary>Whether two options are the same option, like the same event's same choice, without formatting their text.</summary>
     private static bool Same(EventOption mine, EventOption theirs) =>
-        mine.TextKey == theirs.TextKey
-        && mine.Relic?.Id == theirs.Relic?.Id
-        && PeekTips.Text(mine.Title) == PeekTips.Text(theirs.Title)
-        && PeekTips.Text(mine.Description) == PeekTips.Text(theirs.Description);
+        mine.TextKey == theirs.TextKey && mine.Relic?.Id == theirs.Relic?.Id;
 
     private static LinkedPage? Current()
     {
