@@ -133,7 +133,9 @@ The category is linked, and everyone picks their own option within it. With ever
 
 Everyone takes the same option slot, counted in the order each player sees the options. Players often see different options and outcomes in the same slot, and that's expected.
 
-- **Events:** each page of an event is its own decision. Events the game already puts to a group vote stay as they are.
+- **Events:** each page of an event is its own decision, shared by the players on that page. A page with only one option isn't a decision. Events the game already puts to a group vote stay as they are: Battleworn Dummy, Dense Vegetation, Fake Merchant, Jungle Maze Adventure, Morphic Grove, Punch Off, The Lantern Key and War Historian Repy.
+- **Options that would kill you** can't be taken in co-op, so they count as options you can't take.
+- **Waiting for teammates:** a click on an event page waits until every teammate who's heading to the same page has it open, so nobody's choice is made before they've seen the page. The status line shows who you're waiting for.
 - **Multi-pick screens** like Room Full of Cheese (choose 2 of 8 commons): everyone picks the same set of slots.
 - **Card choices inside an event** (remove, transform, upgrade) follow Deck card actions.
 - **Ancients:** same slot.
@@ -206,7 +208,7 @@ To check in-game:
 - [ ] How shop slots are laid out, so they can be numbered
 - [ ] How selection screens order cards, for deck index
 - [ ] How chest rock-paper-scissors works when 3 or 4 players pick one relic
-- [ ] Which events the game puts to a group vote
+- [x] Which events the game puts to a group vote (listed under Events)
 
 ## Credits and sources
 

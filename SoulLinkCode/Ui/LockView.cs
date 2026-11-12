@@ -13,8 +13,6 @@ namespace SoulLink.SoulLinkCode.Ui;
 /// </summary>
 internal static class LockView
 {
-    private const string StatusName = "SoulLinkStatus";
-
     private static readonly Color Dimmed = new(1f, 1f, 1f, 0.35f);
     private static readonly Color MyVote = new(0.7f, 1f, 0.7f);
     private static readonly Color TheirVote = new(0.75f, 0.85f, 1f);
@@ -64,20 +62,9 @@ internal static class LockView
                 : Colors.White;
         }
 
-        StatusLabel(screen).Text = decision.Participants.Count > 1 ? Status(session, linked) : "";
-    }
-
-    /// <summary>What each linked player has picked so far, like "You: want card 2   Ben: took card 2".</summary>
-    private static string Status(SoulLinkSession session, CardRewardScreen screen)
-    {
-        var parts = new List<string>();
-        foreach (var player in screen.Participants)
-        {
-            var isMe = player == session.Me;
-            parts.Add($"{(isMe ? "You" : session.NameOf(player))}: {Doing(screen, player, isMe)}");
-        }
-
-        return string.Join("     ", parts);
+        StatusLine.Set(
+            screen,
+            decision.Participants.Count > 1 ? StatusLine.Join(session, linked.Participants, (player, isMe) => Doing(linked, player, isMe)) : "");
     }
 
     private static string Doing(CardRewardScreen screen, PlayerId player, bool isMe)
@@ -97,28 +84,5 @@ internal static class LockView
         return screen.Decision.VoteOf(player)?.Items[0] is { } vote
             ? $"{(isMe ? "want" : "wants")} {CardRewardLinks.Describe(vote)}"
             : "choosing";
-    }
-
-    private static Label StatusLabel(NCardRewardSelectionScreen screen)
-    {
-        if (screen.GetNodeOrNull<Label>(StatusName) is { } existing)
-        {
-            return existing;
-        }
-
-        var label = new Label
-        {
-            Name = StatusName,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        };
-        label.AddThemeFontSizeOverride("font_size", 28);
-        label.AddThemeConstantOverride("outline_size", 8);
-        label.AddThemeColorOverride("font_outline_color", Colors.Black);
-        screen.AddChild(label);
-        label.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.TopWide);
-        label.OffsetTop = 96;
-        label.OffsetBottom = 140;
-        return label;
     }
 }

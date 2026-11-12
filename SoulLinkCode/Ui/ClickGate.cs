@@ -82,7 +82,7 @@ internal static class ClickGate
             if (op.Check?.Invoke(session.State) is { IsAllowed: false } check && check.Verdict != CommitVerdict.NotParticipant)
             {
                 MainFile.Logger.Info($"Soul Link blocked {op.Action} on {op.Table}: {check}");
-                LockView.Refresh();
+                Views.RefreshAll();
                 answered?.Invoke(false);
                 return false;
             }
@@ -104,7 +104,7 @@ internal static class ClickGate
                 }
 
                 _waiting = false;
-                LockView.Refresh();
+                Views.RefreshAll();
                 answered?.Invoke(!failed);
             });
         }

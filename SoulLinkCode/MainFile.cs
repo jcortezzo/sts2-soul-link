@@ -3,6 +3,7 @@ using BaseLib.Config;
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Modding;
+using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Rewards;
 using SoulLink.SoulLinkCode.Ui;
 
@@ -18,8 +19,9 @@ public partial class MainFile : Node
     public static void Initialize()
     {
         ModConfigRegistry.Register(ModId, new SoulLinkConfig());
-        SoulLinkSession.StateChanged += LockView.Refresh;
+        SoulLinkSession.StateChanged += Views.RefreshAll;
         SoulLinkSession.StateChanged += CardRewardExecutor.Schedule;
+        SoulLinkSession.StateChanged += EventExecutor.Schedule;
 
         Harmony harmony = new(ModId);
         harmony.PatchAll(Assembly.GetExecutingAssembly());

@@ -4,9 +4,9 @@ A co-op mod for Slay the Spire 2 that links every out-of-combat decision between
 
 It's inspired by Pokémon Soul Link challenges and the [Slay the Soul-Link](https://docs.google.com/document/d/1XyDEOh4QqVfNqKOosRGrHEikjtB77w95TzjEURAe4lY/edit?tab=t.0) challenge by Rayditz and naturesbf.
 
-> **Status:** early development. The rules engine and the host-ordered sync are done and tested, and card rewards
-> are linked in game; the other decision screens are next. Not on the Steam Workshop yet, and the name is a working
-> title.
+> **Status:** early development. The rules engine and the host-ordered sync are done and tested. In game, card
+> rewards, events and Ancients (Neow included) are linked so far; relic rewards, chests, campfires, shops and deck card
+> choices are next. Not on the Steam Workshop yet, and the name is a working title.
 
 ## Rules
 
@@ -28,7 +28,7 @@ tests in two folders beside it.
 ```text
 SoulLink.csproj, SoulLink.json   the mod project and its manifest
 SoulLink/                        mod image and config text, packed into SoulLink.pck on build
-SoulLinkCode/                    config, network messages, run session, card reward patches
+SoulLinkCode/                    config, network messages, run session, and the patches for each linked screen
 SoulLink.Core/                   rules engine with no game references; compiled into SoulLink.dll
   Decisions/                     linked decisions: votes or first click, nice and mean modes
   Cards/                         link groups, starter pairing, linked cards and deck index matching
