@@ -36,7 +36,7 @@ public enum WhoDecides
 /// <param name="SharedDeath">Whether any player's death ends the run for everyone.</param>
 /// <param name="WhoDecides">Whether everyone has to agree, or the first click decides.</param>
 public sealed record SoulLinkSettings(
-    CardMatching CardMatching = CardMatching.LinkedCards,
+    CardMatching CardMatching = CardMatching.DeckIndex,
     LinkMode Mode = LinkMode.Nice,
     bool SharedDeath = false,
     WhoDecides WhoDecides = WhoDecides.EveryoneAgrees)

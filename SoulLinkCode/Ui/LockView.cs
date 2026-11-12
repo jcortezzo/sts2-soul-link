@@ -55,7 +55,7 @@ internal static class LockView
             var blocked = views.TryGetValue(key, out var view)
                 && view.State is OptionState.Locked or OptionState.GreyedOut or OptionState.Unavailable or OptionState.NotChosen;
             Dim.Set(holder, blocked);
-            VoteIcons.Show(holder, VoteIcons.BoundsOf(holder, holder.Hitbox), OptionLinks.Backers(decision, key));
+            VoteIcons.Show(holder, VoteIcons.BoundsOf(holder, holder.Hitbox), OptionLinks.Backers(decision, key), relativeHeight: VoteIcons.OnCards);
         }
     }
 

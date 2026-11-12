@@ -45,6 +45,12 @@ public class SoulLinkRunTests
     }
 
     [Fact]
+    public void Deck_index_is_the_default_card_matching()
+    {
+        Assert.Equal(CardMatching.DeckIndex, SoulLinkSettings.Default.CardMatching);
+    }
+
+    [Fact]
     public void Starter_decks_are_linked_at_the_start()
     {
         var run = new SoulLinkRun(SoulLinkSettings.Default);

@@ -135,9 +135,12 @@ internal static class CardRewardExecutor
     /// <summary>Marks the card the local player takes from a linked card reward as gained from it, for linked cards.</summary>
     private static void MarkSource(string table)
     {
-        if (SoulLinkSession.Current is { } session && CardRewardLinks.ScreenOf(table)?.Decision.CommitOf(session.Me) is { } commit)
+        if (SoulLinkSession.Current is { } session
+            && CardRewardLinks.ScreenOf(table)?.Decision.CommitOf(session.Me) is { } commit
+            && commit.Choice.Items[0] is var key
+            && (key.SlotNumber is not null || key.IsExtra))
         {
-            CardLinksSync.GainingFrom(table, commit.Choice.Items[0].Value, commit.Root);
+            CardLinksSync.GainingFrom(table, key.Value, commit.Root);
         }
     }
 

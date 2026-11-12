@@ -15,7 +15,7 @@ The full rules, settings and worked examples are in [docs/rules.md](docs/rules.m
 - **Linked:** card rewards, deck card choices (upgrade, remove, transform, enchant, duplicate), shop purchases, campfires, events, Ancients, relic rewards and chests.
 - **Who decides:** with everyone agrees (the default), a click is a vote and a choice is made once everyone who can make it has clicked it. With first click, the first click makes the choice for everyone at once.
 - **Nice or mean:** when a choice isn't possible for everyone, nice mode lets whoever can follow it, and mean mode greys it out for everyone.
-- **Card matching:** your "same card" is either the card linked to theirs (gained from the same choice) or the card at the same position.
+- **Card matching:** your "same card" is the card at the same position on your card screen by default, or the card linked to theirs (gained from the same choice).
 - **Shared death:** optional. When on, any player's death ends the run.
 
 The host picks these in BaseLib's mod config menu, and everyone in the run plays under the host's settings.

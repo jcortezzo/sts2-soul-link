@@ -193,7 +193,7 @@ internal static class DeckChoices
                 backers.AddRange(shown.Backers.Where(player => !backers.Contains(player)));
             }
 
-            VoteIcons.Show(holder, VoteIcons.BoundsOf(holder, holder.Hitbox), backers);
+            VoteIcons.Show(holder, VoteIcons.BoundsOf(holder, holder.Hitbox), backers, relativeHeight: VoteIcons.OnCards);
         }
     }
 

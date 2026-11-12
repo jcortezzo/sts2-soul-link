@@ -15,6 +15,12 @@ internal static class VoteIcons
     private const string IconScene = "ui/multiplayer_vote_icon";
     private const string PlayerMeta = "soul_link_player";
 
+    /// <summary>
+    /// How tall the portraits on a card are, as a share of the card's height. The game's portraits are sized for event
+    /// buttons, which made them tiny on cards.
+    /// </summary>
+    public const float OnCards = 0.18f;
+
     /// <summary>Where the row of portraits sits on the option.</summary>
     public enum Placement
     {
@@ -35,7 +41,11 @@ internal static class VoteIcons
     /// <param name="bounds">The option's visible area in the target's own coordinates.</param>
     /// <param name="players">The players to show, in order.</param>
     /// <param name="placement">Where to put the row.</param>
-    public static void Show(Control target, Rect2 bounds, IReadOnlyList<PlayerId> players, Placement placement = Placement.Above)
+    /// <param name="relativeHeight">
+    /// How tall the portraits are as a share of the option's height, like <see cref="OnCards"/>; 0 keeps the game's
+    /// size.
+    /// </param>
+    public static void Show(Control target, Rect2 bounds, IReadOnlyList<PlayerId> players, Placement placement = Placement.Above, float relativeHeight = 0)
     {
         if (!GodotObject.IsInstanceValid(target))
         {
@@ -49,11 +59,17 @@ internal static class VoteIcons
             return;
         }
 
+        // The row is the option's last child, so it's drawn over the option but, unlike a raised z index, still under
+        // hover tips, such as the card preview slot peek shows.
         if (row is null)
         {
-            row = new HBoxContainer { Name = RowName, MouseFilter = Control.MouseFilterEnum.Ignore, ZIndex = 5 };
+            row = new HBoxContainer { Name = RowName, MouseFilter = Control.MouseFilterEnum.Ignore };
             row.AddThemeConstantOverride("separation", -6);
             target.AddChild(row);
+        }
+        else if (row.GetIndex() != target.GetChildCount() - 1)
+        {
+            target.MoveChild(row, -1);
         }
 
         foreach (var child in row.GetChildren().OfType<Control>().ToList())
@@ -77,14 +93,17 @@ internal static class VoteIcons
             icon.CreateTween().TweenProperty(icon, "modulate:a", 1f, 0.2);
         }
 
-        var size = row.GetCombinedMinimumSize();
-        row.Size = size;
+        var natural = row.GetCombinedMinimumSize();
+        var scale = relativeHeight > 0 && natural.Y > 0 ? bounds.Size.Y * relativeHeight / natural.Y : 1f;
+        row.Size = natural;
+        row.Scale = new Vector2(scale, scale);
+        var size = natural * scale;
         var x = bounds.Position.X + (bounds.Size.X - size.X) / 2;
         row.Position = placement switch
         {
-            Placement.Above => new Vector2(x, bounds.Position.Y - size.Y + 6),
-            Placement.Below => new Vector2(x, bounds.End.Y - 6),
-            _ => new Vector2(bounds.End.X + 4, bounds.Position.Y + (bounds.Size.Y - size.Y) / 2),
+            Placement.Above => new Vector2(x, bounds.Position.Y - size.Y + 6 * scale),
+            Placement.Below => new Vector2(x, bounds.End.Y - 6 * scale),
+            _ => new Vector2(bounds.End.X + 4 * scale, bounds.Position.Y + (bounds.Size.Y - size.Y) / 2),
         };
     }
 

@@ -146,13 +146,34 @@ internal static class CardRewardGatePatches
             return true;
         }
 
+        if (key == CardRewardKeys.Skip)
+        {
+            return Skip(__instance, table);
+        }
+
         return CardRewardExecutor.TakeCommittedClick(__instance, table, key)
             || ClickGate.Request(CardRewardLinks.JoinOps(reward).Append(CardRewardLinks.Choose(table, key)).ToList());
     }
 
     /// <summary>
-    /// Leaving the rewards screen skips every card reward the player didn't take, so it's linked like pressing Skip.
-    /// The player leaves once every card reward is done: at once with first click, or once everyone agrees.
+    /// Skip only closes the screen, as in the base game, and decides nothing: the reward stays on the rewards screen,
+    /// so players can come back and agree on a card later, and votes already cast stay. Leaving the rewards screen is
+    /// what skips it. A player bound to a card can't close the screen without it, since the mod takes it for them.
+    /// </summary>
+    private static bool Skip(NCardRewardSelectionScreen screen, string table)
+    {
+        if (CardRewardExecutor.CommittedKey(table) is { } committed && committed != CardRewardKeys.Skip)
+        {
+            return false;
+        }
+
+        CardRewardExecutor.TakeCommittedClick(screen, table, CardRewardKeys.Skip);
+        return true;
+    }
+
+    /// <summary>
+    /// Leaving the rewards screen skips every card reward the player didn't take, so it's linked: a skip vote with
+    /// everyone agrees, or a skip for everyone with first click. The player leaves once every card reward is done.
     /// </summary>
     [HarmonyPatch(typeof(NRewardsScreen), "OnProceedButtonPressed")]
     [HarmonyPrefix]
