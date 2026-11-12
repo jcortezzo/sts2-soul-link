@@ -14,25 +14,27 @@ internal static class ChestPatches
 {
     [HarmonyPatch(typeof(NTreasureRoomRelicCollection), nameof(NTreasureRoomRelicCollection.InitializeRelics))]
     [HarmonyPostfix]
-    private static void JoinChest() => ChestLinks.Schedule();
+    private static void JoinChest() => Guard.Run("join a chest", ChestLinks.Schedule);
 
     [HarmonyPatch(typeof(NTreasureRoomRelicCollection), "PickRelic")]
     [HarmonyPrefix]
-    private static bool GateRelic(NTreasureRoomRelicHolder holder) => ChestLinks.ClickRelic(holder.Index);
+    private static bool GateRelic(NTreasureRoomRelicHolder holder) =>
+        !ClickGate.SettingsPending && Guard.Gate("link a chest pick", () => ChestLinks.ClickRelic(holder.Index));
 
     [HarmonyPatch(typeof(NTreasureRoom), "OnProceedButtonPressed")]
     [HarmonyPrefix]
     private static bool GateSkip(NTreasureRoom __instance) =>
-        ClickGate.TryConsumeApproval(__instance) || ChestLinks.ClickSkip(__instance);
+        ClickGate.TryConsumeApproval(__instance)
+        || (!ClickGate.SettingsPending && Guard.Gate("link a chest skip", () => ChestLinks.ClickSkip(__instance)));
 
     /// <summary>Shows linked votes on the relics with the game's own vote portraits.</summary>
     [HarmonyPatch(typeof(NTreasureRoomRelicHolder), "PlayerVotedForRelic")]
     [HarmonyPostfix]
     private static void ShowRelicVote(NTreasureRoomRelicHolder __instance, Player player, ref bool __result) =>
-        __result = __result || ChestLinks.Backs(player.NetId, OptionKey.Slot(__instance.Index + 1));
+        __result = __result || Guard.Show("show a chest vote", () => ChestLinks.Backs(player.NetId, OptionKey.Slot(__instance.Index + 1)));
 
     [HarmonyPatch(typeof(NTreasureRoom), "IsPlayerVotingForSkip")]
     [HarmonyPostfix]
     private static void ShowSkipVote(Player player, ref bool __result) =>
-        __result = __result || ChestLinks.Backs(player.NetId, OptionKey.Skip);
+        __result = __result || Guard.Show("show a chest skip vote", () => ChestLinks.Backs(player.NetId, OptionKey.Skip));
 }

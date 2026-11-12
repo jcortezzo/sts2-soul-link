@@ -26,6 +26,7 @@ internal sealed class SoulLinkSession
     private SoulLinkSession(INetGameService net, bool isHost)
     {
         _net = net;
+        StartedAtMsec = Godot.Time.GetTicksMsec();
         Me = new PlayerId(net.NetId);
         if (isHost)
         {
@@ -52,6 +53,9 @@ internal sealed class SoulLinkSession
 
     /// <summary>The local player.</summary>
     public PlayerId Me { get; }
+
+    /// <summary>When the session started, in engine ticks.</summary>
+    public ulong StartedAtMsec { get; }
 
     public bool IsHost => _host is not null;
 

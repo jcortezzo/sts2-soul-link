@@ -11,21 +11,22 @@ internal static class ShopPatches
 {
     [HarmonyPatch(typeof(NMerchantRoom), "AfterRoomIsLoaded")]
     [HarmonyPostfix]
-    private static void Enter() => ShopLinks.Schedule();
+    private static void Enter() => Guard.Run("follow the shop", ShopLinks.Schedule);
 
     [HarmonyPatch(typeof(NMerchantInventory), nameof(NMerchantInventory.Open))]
     [HarmonyPostfix]
-    private static void Opened() => ShopLinks.Schedule();
+    private static void Opened() => Guard.Run("follow the shop", ShopLinks.Schedule);
 
     [HarmonyPatch(typeof(NMerchantInventory), "OnPurchaseCompleted")]
     [HarmonyPostfix]
-    private static void Purchased() => ShopLinks.Schedule();
+    private static void Purchased() => Guard.Run("follow the shop", ShopLinks.Schedule);
 
     [HarmonyPatch(typeof(NMerchantSlot), "OnSelected")]
     [HarmonyPrefix]
     private static bool GateSlot(NMerchantSlot __instance, ref Task __result)
     {
-        if (ClickGate.TryConsumeApproval(__instance) || ShopLinks.Click(__instance))
+        if (ClickGate.TryConsumeApproval(__instance)
+            || (!ClickGate.SettingsPending && Guard.Gate("link a purchase", () => ShopLinks.Click(__instance))))
         {
             return true;
         }

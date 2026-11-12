@@ -16,20 +16,20 @@ internal static class EventTrackingPatches
     /// <summary>The event room shows a page's options here, when the event starts and after every choice.</summary>
     [HarmonyPatch(typeof(NEventRoom), "SetOptions")]
     [HarmonyPostfix]
-    private static void JoinPage()
+    private static void JoinPage() => Guard.Run("join an event page", () =>
     {
         EventLinks.JoinCurrent();
         EventExecutor.Schedule();
-    }
+    });
 
     /// <summary>Every player's choice in an event they don't vote on goes through here, on every peer.</summary>
     [HarmonyPatch(typeof(EventSynchronizer), "ChooseOptionForEvent")]
     [HarmonyPrefix]
-    private static void CountChoice(EventSynchronizer __instance, Player player)
+    private static void CountChoice(EventSynchronizer __instance, Player player) => Guard.Run("count an event choice", () =>
     {
         EventLinks.CountChoice(__instance, player);
         EventExecutor.Schedule();
-    }
+    });
 
     [HarmonyPatch(typeof(NEventOptionButton), nameof(NEventOptionButton.AnimateIn))]
     [HarmonyPostfix]
@@ -48,7 +48,7 @@ internal static class EventTrackingPatches
     {
         if (!__result)
         {
-            __result = EventView.ShowsVote(__instance, player.NetId);
+            __result = Guard.Show("show an event vote", () => EventView.ShowsVote(__instance, player.NetId));
         }
     }
 }
@@ -62,7 +62,10 @@ internal static class EventGatePatches
 {
     [HarmonyPatch(typeof(NEventRoom), nameof(NEventRoom.OptionButtonClicked))]
     [HarmonyPrefix]
-    private static bool GateOption(NEventRoom __instance, EventOption option, int index)
+    private static bool GateOption(NEventRoom __instance, EventOption option, int index) =>
+        !ClickGate.SettingsPending && Guard.Gate("link an event choice", () => Gate(__instance, option, index));
+
+    private static bool Gate(NEventRoom __instance, EventOption option, int index)
     {
         if (ClickGate.TryConsumeApproval(__instance)
             || option.IsLocked

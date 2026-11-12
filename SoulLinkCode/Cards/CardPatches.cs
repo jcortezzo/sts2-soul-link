@@ -66,7 +66,7 @@ internal static class CardScreenPatches
     private static void BeforeFinish(NCardGridSelectionScreen __instance, out TaskCompletionSource<IEnumerable<CardModel>>? __state)
     {
         __state = null;
-        if (!DeckChoices.IsLinked(__instance))
+        if (!Guard.Show("check a card screen", () => DeckChoices.IsLinked(__instance)))
         {
             return;
         }

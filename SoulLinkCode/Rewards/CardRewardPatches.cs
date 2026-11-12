@@ -23,25 +23,25 @@ internal static class CardRewardTrackingPatches
 {
     [HarmonyPatch(typeof(NRewardsScreen), nameof(NRewardsScreen.ShowScreen))]
     [HarmonyPostfix]
-    private static void TrackRewardsSet(RewardsSet set, NRewardsScreen? __result)
+    private static void TrackRewardsSet(RewardsSet set, NRewardsScreen? __result) => Guard.Run("track a rewards screen", () =>
     {
         CardRewardLinks.ShowSet(set);
         if (__result is not null && LocalContext.IsMe(set.Player))
         {
             CardRewardExecutor.TrackRewardsScreen(__result);
         }
-    }
+    });
 
     [HarmonyPatch(typeof(CardReward), "OnSelect")]
     [HarmonyPrefix]
-    private static void JoinCardReward(CardReward __instance)
+    private static void JoinCardReward(CardReward __instance) => Guard.Run("join a card reward", () =>
     {
         CardRewardLinks.Open(__instance);
         if (LocalContext.IsMe(__instance.Player))
         {
             CardRewardExecutor.OnOpened(__instance);
         }
-    }
+    });
 
     /// <summary>The executor checks for picks whenever a card reward screen opens or closes.</summary>
     [HarmonyPatch(typeof(NCardRewardSelectionScreen), nameof(NCardRewardSelectionScreen.ShowScreen))]
@@ -69,13 +69,13 @@ internal static class CardRewardTrackingPatches
     /// </summary>
     [HarmonyPatch(typeof(CardReward), nameof(CardReward.Reroll))]
     [HarmonyPostfix]
-    private static void ReportReroll(CardReward __instance)
+    private static void ReportReroll(CardReward __instance) => Guard.Run("report a reroll", () =>
     {
         if (LocalContext.IsMe(__instance.Player))
         {
             CardRewardLinks.ReportReroll(__instance);
         }
-    }
+    });
 
     /// <summary>Lasting Candy appends its bonus Power to the reward's cards; mark it as an extra rather than a slot.</summary>
     [HarmonyPatch(typeof(LastingCandy), nameof(LastingCandy.TryModifyCardRewardOptions))]
@@ -84,13 +84,13 @@ internal static class CardRewardTrackingPatches
 
     [HarmonyPatch(typeof(LastingCandy), nameof(LastingCandy.TryModifyCardRewardOptions))]
     [HarmonyPostfix]
-    private static void MarkBonusCard(List<CardCreationResult> rewardOptions, int __state)
+    private static void MarkBonusCard(List<CardCreationResult> rewardOptions, int __state) => Guard.Run("mark a bonus card", () =>
     {
         for (var i = __state; i < rewardOptions.Count; i++)
         {
             CardRewardLinks.MarkExtra(rewardOptions[i], CardRewardLinks.LastingCandySource);
         }
-    }
+    });
 }
 
 /// <summary>
@@ -102,7 +102,10 @@ internal static class CardRewardGatePatches
 {
     [HarmonyPatch(typeof(NCardRewardSelectionScreen), "SelectCard")]
     [HarmonyPrefix]
-    private static bool GateCard(NCardRewardSelectionScreen __instance, NCardHolder cardHolder)
+    private static bool GateCard(NCardRewardSelectionScreen __instance, NCardHolder cardHolder) =>
+        !ClickGate.SettingsPending && Guard.Gate("link a card pick", () => Card(__instance, cardHolder));
+
+    private static bool Card(NCardRewardSelectionScreen __instance, NCardHolder cardHolder)
     {
         if (ClickGate.TryConsumeApproval(__instance)
             || CardRewardLinks.ActiveReward is not { } reward
@@ -125,7 +128,10 @@ internal static class CardRewardGatePatches
 
     [HarmonyPatch(typeof(NCardRewardSelectionScreen), "OnAlternateRewardSelected")]
     [HarmonyPrefix]
-    private static bool GateAlternative(NCardRewardSelectionScreen __instance, int index)
+    private static bool GateAlternative(NCardRewardSelectionScreen __instance, int index) =>
+        !ClickGate.SettingsPending && Guard.Gate("link a card reward button", () => Alternative(__instance, index));
+
+    private static bool Alternative(NCardRewardSelectionScreen __instance, int index)
     {
         if (ClickGate.TryConsumeApproval(__instance)
             || CardRewardLinks.ActiveReward is not { } reward
@@ -150,7 +156,10 @@ internal static class CardRewardGatePatches
     /// </summary>
     [HarmonyPatch(typeof(NRewardsScreen), "OnProceedButtonPressed")]
     [HarmonyPrefix]
-    private static bool GateProceed(NRewardsScreen __instance, NButton __0)
+    private static bool GateProceed(NRewardsScreen __instance, NButton __0) =>
+        !ClickGate.SettingsPending && Guard.Gate("link leaving the rewards", () => Proceed(__instance, __0));
+
+    private static bool Proceed(NRewardsScreen __instance, NButton __0)
     {
         if (ClickGate.TryConsumeApproval(__instance)
             || RewardAccess.RewardsSet(__instance) is not { } set
@@ -211,7 +220,18 @@ internal static class CardRewardGatePatches
     private static bool GateRelicReward(NRewardButton __instance, ref Task __result)
     {
         if (ClickGate.TryConsumeApproval(__instance)
-            || __instance.Reward is not RelicReward reward
+            || (!ClickGate.SettingsPending && Guard.Gate("link a relic reward", () => RelicReward(__instance))))
+        {
+            return true;
+        }
+
+        __result = Task.CompletedTask;
+        return false;
+    }
+
+    private static bool RelicReward(NRewardButton button)
+    {
+        if (button.Reward is not RelicReward reward
             || !LocalContext.IsMe(reward.Player)
             || SoulLinkSession.Current is not { Run: not null }
             || RelicRewardLinks.TableId(reward) is not { } table
@@ -223,7 +243,6 @@ internal static class CardRewardGatePatches
         // Clicking a relic means the player isn't leaving yet.
         CardRewardExecutor.CancelProceed();
         ClickGate.Request([.. RelicRewardLinks.JoinOps(reward), OptionLinks.Choose(table, OptionKey.Take)]);
-        __result = Task.CompletedTask;
         return false;
     }
 

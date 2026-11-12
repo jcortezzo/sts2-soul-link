@@ -12,17 +12,18 @@ internal static class CampfirePatches
 {
     [HarmonyPatch(typeof(NRestSiteRoom), "UpdateRestSiteOptions")]
     [HarmonyPostfix]
-    private static void Arrive() => CampfireLinks.Schedule();
+    private static void Arrive() => Guard.Run("arrive at a campfire", CampfireLinks.Schedule);
 
     [HarmonyPatch(typeof(NRestSiteRoom), nameof(NRestSiteRoom.AfterSelectingOption))]
     [HarmonyPostfix]
-    private static void AfterOption() => CampfireLinks.Schedule();
+    private static void AfterOption() => Guard.Run("follow up a campfire option", CampfireLinks.Schedule);
 
     [HarmonyPatch(typeof(NRestSiteButton), "SelectOption")]
     [HarmonyPrefix]
     private static bool GateOption(NRestSiteButton __instance, RestSiteOption option, ref Task __result)
     {
-        if (ClickGate.TryConsumeApproval(__instance) || CampfireLinks.Click(option))
+        if (ClickGate.TryConsumeApproval(__instance)
+            || (!ClickGate.SettingsPending && Guard.Gate("link a campfire option", () => CampfireLinks.Click(option))))
         {
             return true;
         }

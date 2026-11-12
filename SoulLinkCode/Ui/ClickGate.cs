@@ -28,9 +28,22 @@ internal static class ClickGate
     /// <summary>How long to ignore further clicks while waiting for the host, in case an answer never arrives.</summary>
     private const ulong WaitLimitMsec = 5000;
 
+    /// <summary>
+    /// How long after the run starts to hold linked clicks while the host's settings are on their way. After that the
+    /// host is assumed not to run the mod, and the game takes clicks as usual.
+    /// </summary>
+    private const ulong SettingsLimitMsec = 10000;
+
     private static object? _approved;
     private static bool _waiting;
     private static ulong _waitingSince;
+
+    /// <summary>
+    /// True in the first moments of a co-op run, before the host's settings arrive: linked clicks are ignored then,
+    /// rather than going to the game unlinked.
+    /// </summary>
+    public static bool SettingsPending =>
+        SoulLinkSession.Current is { Run: null } session && Time.GetTicksMsec() - session.StartedAtMsec < SettingsLimitMsec;
 
     /// <summary>True when the mod itself is doing this click, so the patch should let it through.</summary>
     public static bool TryConsumeApproval(object owner)
