@@ -213,22 +213,7 @@ public class WorkedExamplesTests
     }
 
     [Fact]
-    public void Example_11_chest()
-    {
-        var chest = new SoulLinkRun(FirstClick).NewOptionDecision();
-        foreach (var player in new[] { Ana, Ben, Cal })
-        {
-            chest.Join(player, TestOptions.Slots(3));
-        }
-
-        // Ana picks relic 1, so Ben and Cal must pick relic 1.
-        var picks = chest.Choose(Ana, OptionKey.Slot(1));
-        Assert.Equal([Ana, Ben, Cal], picks.Select(commit => commit.Player));
-        Assert.All(picks, commit => Assert.Equal(Selection.Of(OptionKey.Slot(1)), commit.Choice));
-    }
-
-    [Fact]
-    public void Example_12_shared_death_on()
+    public void Example_11_shared_death_on()
     {
         var run = new SoulLinkRun(FirstClick with { SharedDeath = true });
 
@@ -237,7 +222,7 @@ public class WorkedExamplesTests
     }
 
     [Fact]
-    public void Example_13_card_reward_everyone_agrees()
+    public void Example_12_card_reward_everyone_agrees()
     {
         var round = new SoulLinkRun(SoulLinkSettings.Default).NewCardRewardRound();
         foreach (var player in new[] { Ana, Ben, Cal })
@@ -258,7 +243,7 @@ public class WorkedExamplesTests
     }
 
     [Fact]
-    public void Example_14_shop_everyone_agrees()
+    public void Example_13_shop_everyone_agrees()
     {
         var shop = new SoulLinkRun(SoulLinkSettings.Default).NewShop();
         shop.Enter(Ana, gold: 300, freePotionSlots: 2, [new(ShopSlot.Relic(2), 150)]);
@@ -272,7 +257,7 @@ public class WorkedExamplesTests
     }
 
     [Fact]
-    public void Example_15_campfire_everyone_agrees()
+    public void Example_14_campfire_everyone_agrees()
     {
         var campfire = new SoulLinkRun(SoulLinkSettings.Default).NewCampfire();
         campfire.Join(Ana, AllOptions, hasMiniatureTent: false, Screen(Ana, 10));

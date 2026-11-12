@@ -1,6 +1,5 @@
 using SoulLink.SoulLinkCode.Campfires;
 using SoulLink.SoulLinkCode.Cards;
-using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Rewards;
 using SoulLink.SoulLinkCode.Shops;
@@ -15,7 +14,6 @@ internal static class Views
         Refresh("card reward", LockView.Refresh);
         Refresh("relic reward", () => RelicRewardLinks.Refresh(CardRewardExecutor.RewardsScreen, CardRewardLinks.CurrentSet));
         Refresh("event", EventView.Refresh);
-        Refresh("chest", ChestLinks.Refresh);
         Refresh("campfire", CampfireLinks.Refresh);
         Refresh("shop", ShopLinks.Refresh);
         Refresh("card choice", DeckChoices.Refresh);

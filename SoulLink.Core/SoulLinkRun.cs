@@ -40,7 +40,7 @@ public sealed class SoulLinkRun
 
     public RunTracker Tracker { get; }
 
-    /// <summary>A decision matched by option: events, Ancients, relic rewards, chests.</summary>
+    /// <summary>A decision matched by option: events, Ancients, relic rewards.</summary>
     public OptionDecision NewOptionDecision(int pickCount = 1) => new(Settings.Mode, pickCount, Settings.WhoDecides);
 
     /// <summary>A choice of cards from players' decks for the same action.</summary>

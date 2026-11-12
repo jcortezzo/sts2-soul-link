@@ -5,14 +5,15 @@ A co-op mod for Slay the Spire 2 that links every out-of-combat decision between
 It's inspired by Pokémon Soul Link challenges and the [Slay the Soul-Link](https://docs.google.com/document/d/1XyDEOh4QqVfNqKOosRGrHEikjtB77w95TzjEURAe4lY/edit?tab=t.0) challenge by Rayditz and naturesbf.
 
 > **Status:** early development, ready for co-op playtesting. Every decision in the rules is linked in game: card
-> rewards, deck card choices, shops, campfires, events, Ancients (Neow included), relic rewards and chests. Links between
+> rewards, deck card choices, shops, campfires, events, Ancients (Neow included) and relic rewards. Chests stay as in the
+> base game. Links between
 > cards aren't saved with the run yet. Not on the Steam Workshop yet, and the name is a working title.
 
 ## Rules
 
 The full rules, settings and worked examples are in [docs/rules.md](docs/rules.md). In short:
 
-- **Linked:** card rewards, deck card choices (upgrade, remove, transform, enchant, duplicate), shop purchases, campfires, events, Ancients, relic rewards and chests.
+- **Linked:** card rewards, deck card choices (upgrade, remove, transform, enchant, duplicate), shop purchases, campfires, events, Ancients and relic rewards. Treasure chests stay as in the base game.
 - **Who decides:** with everyone agrees (the default), a click is a vote and a choice is made once everyone who can make it has clicked it. With first click, the first click makes the choice for everyone at once.
 - **Nice or mean:** when a choice isn't possible for everyone, nice mode lets whoever can follow it, and mean mode greys it out for everyone.
 - **Card matching:** your "same card" is the card at the same position on your card screen by default, or the card linked to theirs (gained from the same choice).

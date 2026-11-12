@@ -3,7 +3,6 @@ using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Runs;
 using SoulLink.SoulLinkCode.Campfires;
 using SoulLink.SoulLinkCode.Cards;
-using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Linking;
 using SoulLink.SoulLinkCode.Rewards;
@@ -42,7 +41,6 @@ internal static class RunLifecyclePatches
         RelicRewardLinks.Reset();
         EventLinks.Reset();
         EventExecutor.Reset();
-        ChestLinks.Reset();
         CampfireLinks.Reset();
         ShopLinks.Reset();
         DeckChoices.Reset();

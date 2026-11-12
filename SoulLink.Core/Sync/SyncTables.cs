@@ -160,7 +160,7 @@ public abstract class SyncTable : ISyncTable
     }
 }
 
-/// <summary>A decision matched by option key: events, Ancients, relic rewards, chests.</summary>
+/// <summary>A decision matched by option key: events, Ancients, relic rewards.</summary>
 public sealed class OptionTable : SyncTable
 {
     public OptionTable(string id, LinkMode mode, int pickCount, WhoDecides whoDecides = WhoDecides.EveryoneAgrees)

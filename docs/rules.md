@@ -7,7 +7,7 @@ This is the rules spec the mod implements, kept in the repo so the code and the 
 In a co-op run, every out-of-combat decision is linked: everyone who can make the same choice makes it together. By default a choice is made once everyone who can make it has clicked it; a setting lets the first click decide for everyone instead. Combat, potions and the map stay free.
 
 - **Players:** 2 to 4, all running the mod.
-- **Linked:** card rewards, deck card choices (upgrade, remove, transform, enchant, duplicate), shop purchases, campfires, events, Ancients, relic rewards and chests.
+- **Linked:** card rewards, deck card choices (upgrade, remove, transform, enchant, duplicate), shop purchases, campfires, events, Ancients and relic rewards.
 - **Settings** decide how strict it is: how cards are matched, what happens when someone can't follow (nice or mean), whether everyone has to agree, and whether one death ends the run.
 - **Origin:** our own rules, plus the campfire categories and linked cards from the [Slay the Soul-Link](https://docs.google.com/document/d/1XyDEOh4QqVfNqKOosRGrHEikjtB77w95TzjEURAe4lY/edit?tab=t.0) challenge by Rayditz and naturesbf, extended to 4 players and enforced by the mod.
 
@@ -133,7 +133,7 @@ The category is linked, and everyone picks their own option within it. With ever
 - **Can't do the category:** nice, you choose freely; mean, that category was greyed out.
 - **[Miniature Tent](https://metabot.gg/en/slay-the-spire-2/relic/miniature_tent):** holders can choose any number of options, and their choices don't set the category for others. Anything a holder does that others also do still matches, like a Smith target.
 
-## Events, Ancients, relic rewards and chests
+## Events, Ancients and relic rewards
 
 Everyone takes the same option slot, counted in the order each player sees the options. Players often see different options and outcomes in the same slot, and that's expected.
 
@@ -145,7 +145,6 @@ Everyone takes the same option slot, counted in the order each player sees the o
 - **Card choices inside an event** (remove, transform, upgrade) follow Deck card actions.
 - **Ancients:** same slot.
 - **Relic rewards after fights:** taking or skipping is linked. Leaving the rewards screen skips any relic reward you didn't take, as it does for card rewards.
-- **Treasure chests:** same slot, and this is intended. Co-op chests hold [one relic per player in a shared pool](https://slaythespire-2.com/blog/20260403-co-op), so everyone goes for the same relic. The game's rock-paper-scissors decides who gets it, and the others get what's left. Skipping is linked too, and skipping leaves the chest as usual.
 
 ## Not linked
 
@@ -156,6 +155,7 @@ These stay exactly as in normal co-op:
 - **The map:** the game's own vote.
 - **Automatic effects:** gold and HP changes, and anything a relic or card does on its own.
 - **Personal picks:** Mend's target and character selection.
+- **Treasure chests:** co-op chests hold [one relic per player in a shared pool](https://slaythespire-2.com/blog/20260403-co-op), and when two players pick the same relic the game's rock-paper-scissors decides who gets it.
 
 ## Death
 
@@ -167,7 +167,7 @@ With shared death on, any player's death ends the run for everyone, as in a Pok√
 
 The mod shows what's linked before anyone clicks, so nobody has to count slots or remember links.
 
-- **Slot peek:** hover a slot to see what each teammate has in it, headed with their name and portrait. On card rewards and cards offered on the spot it's their card in the same slot; on deck card screens it's the card they would pick from their deck; in the shop it's their item and what it costs them; at Ancients and events it's their option, when it differs from yours or they can't take it. Chest relics are shared, so there's nothing to peek.
+- **Slot peek:** hover a slot to see what each teammate has in it, headed with their name and portrait. On card rewards and cards offered on the spot it's their card in the same slot; on deck card screens it's the card they would pick from their deck; in the shop it's their item and what it costs them; at Ancients and events it's their option, when it differs from yours or they can't take it.
 - **Lock indicator:** after someone commits, their portrait sits on your matching option. Options you can't take are dimmed.
 - **Votes:** each option shows the character portraits of the players who clicked it, like the game's own group votes, on cards, relics and event options alike. With everyone agrees you can see what everyone is waiting for.
 - **Free indicator:** in nice mode, shows when you're not bound and why.
@@ -189,11 +189,10 @@ Each example is a scenario the mod must handle exactly this way, so each one bec
 8. **Smith, linked cards, mean.** Same decks. Starter group 1 is greyed out for Ana, because Ben's Strike can't be upgraded again.
 9. **Smith, deck index.** Ana upgrades card 17 on her upgrade screen. Ben's screen shows 15 cards, so he upgrades card 15.
 10. **Campfire with Miniature Tent.** Ana has Miniature Tent. Ben smiths first, so Cal must pick Smith, Dig, Cook or Lift. Ana can do every option; if she or Cal smith, their targets match Ben's.
-11. **Chest.** Ana picks relic 1, so Ben and Cal must pick relic 1. Rock-paper-scissors decides who gets it, and the others get the remaining relics.
-12. **Shared death on.** Cal dies in an elite fight. The run ends for everyone, even if Ana and Ben win the fight.
-13. **Card reward, everyone agrees.** Ana and Ben click slot 2 and Cal tries to leave the rewards screen, which votes to skip his card reward, so nothing is taken yet. When Cal goes back and clicks slot 2, all three take slot 2.
-14. **Shop, everyone agrees.** Ana and Ben click relic slot 2. Cal can't afford his, so nobody waits for him, and Ana and Ben buy theirs.
-15. **Campfire, everyone agrees.** Cal has Miniature Tent and rests right away. Ana clicks Rest and Ben clicks Smith, so neither happens yet. When Ana switches to Dig, both picked Improve: Ana digs and Ben smiths.
+11. **Shared death on.** Cal dies in an elite fight. The run ends for everyone, even if Ana and Ben win the fight.
+12. **Card reward, everyone agrees.** Ana and Ben click slot 2 and Cal tries to leave the rewards screen, which votes to skip his card reward, so nothing is taken yet. When Cal goes back and clicks slot 2, all three take slot 2.
+13. **Shop, everyone agrees.** Ana and Ben click relic slot 2. Cal can't afford his, so nobody waits for him, and Ana and Ben buy theirs.
+14. **Campfire, everyone agrees.** Cal has Miniature Tent and rests right away. Ana clicks Rest and Ben clicks Smith, so neither happens yet. When Ana switches to Dig, both picked Improve: Ana digs and Ben smiths.
 
 ## Proposed defaults and open items
 
@@ -212,7 +211,6 @@ To check in-game:
 
 - [ ] How shop slots are laid out, so they can be numbered
 - [ ] How selection screens order cards, for deck index
-- [ ] How chest rock-paper-scissors works when 3 or 4 players pick one relic
 - [x] Which events the game puts to a group vote (listed under Events)
 
 ## Credits and sources

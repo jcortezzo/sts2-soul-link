@@ -5,7 +5,6 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Modding;
 using SoulLink.SoulLinkCode.Campfires;
 using SoulLink.SoulLinkCode.Cards;
-using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Rewards;
 using SoulLink.SoulLinkCode.Shops;
@@ -27,7 +26,6 @@ public partial class MainFile : Node
         SoulLinkSession.StateChanged += Views.RefreshAll;
         SoulLinkSession.StateChanged += CardRewardExecutor.Schedule;
         SoulLinkSession.StateChanged += EventExecutor.Schedule;
-        SoulLinkSession.StateChanged += ChestLinks.Schedule;
         SoulLinkSession.StateChanged += CampfireLinks.Schedule;
         SoulLinkSession.StateChanged += ShopLinks.Schedule;
         SoulLinkSession.StateChanged += DeckChoices.Schedule;
