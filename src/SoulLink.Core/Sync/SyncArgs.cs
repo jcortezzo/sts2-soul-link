@@ -8,6 +8,8 @@ public static class SyncArgs
 {
     public static string Number(long value) => value.ToString(CultureInfo.InvariantCulture);
 
+    public static string Player(PlayerId player) => player.Value.ToString(CultureInfo.InvariantCulture);
+
     public static string Flag(bool value) => value ? "1" : "0";
 }
 
@@ -30,6 +32,30 @@ internal sealed class ArgReader(IReadOnlyList<string> args)
         long.TryParse(String(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value)
             ? value
             : throw new SyncRejectedException("An argument isn't a number.");
+
+    /// <summary>A list length, from 0 to <see cref="SyncCodec.MaxListLength"/>.</summary>
+    public int Count()
+    {
+        var count = Int();
+        return count is >= 0 and <= SyncCodec.MaxListLength ? count : throw new SyncRejectedException("A list length is out of range.");
+    }
+
+    public PlayerId Player() =>
+        ulong.TryParse(String(), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
+            ? new PlayerId(value)
+            : throw new SyncRejectedException("An argument isn't a player.");
+
+    /// <summary>The next <paramref name="count"/> arguments.</summary>
+    public List<string> Strings(int count)
+    {
+        var strings = new List<string>(count);
+        for (var i = 0; i < count; i++)
+        {
+            strings.Add(String());
+        }
+
+        return strings;
+    }
 
     /// <summary>A number, or null for an empty argument.</summary>
     public int? OptionalInt()
@@ -78,29 +104,61 @@ internal sealed class ArgReader(IReadOnlyList<string> args)
     }
 }
 
-/// <summary>Encodes a host commit so clients can apply exactly the same commit.</summary>
+/// <summary>
+/// Encodes the commits the host made while applying an operation, for any player, so clients apply exactly the same
+/// commits instead of working them out from their own copy of the links.
+/// </summary>
 internal static class CommitCodec
 {
-    public static IReadOnlyList<string> Encode<TAtom>(Commit<TAtom> commit)
-        where TAtom : notnull =>
-    [
-        SyncArgs.Number(commit.Sequence),
-        commit.Kind.ToString(),
-        commit.Follows is { } follows ? SyncArgs.Number(follows) : "",
-        SyncArgs.Flag(commit.Overrides),
-        commit.Mode.ToString(),
-        .. commit.Link.Parts,
-    ];
-
-    public static Commit<TAtom> Decode<TAtom>(PlayerId player, Selection<TAtom> choice, IReadOnlyList<string> result)
+    /// <summary>
+    /// A count, then for each commit: the player, the choice's length and items, the sequence, kind, followed commit,
+    /// override flag and mode, then the link's length and parts.
+    /// </summary>
+    public static IEnumerable<string> Encode<TAtom>(IEnumerable<Commit<TAtom>> commits, Func<TAtom, string> format)
         where TAtom : notnull
     {
-        var reader = new ArgReader(result);
-        var sequence = reader.Int();
-        var kind = reader.Enum<CommitKind>();
-        var follows = reader.OptionalInt();
-        var overrides = reader.Bool();
-        var mode = reader.Enum<LinkMode>();
-        return new Commit<TAtom>(sequence, player, choice, new LinkKey(reader.Rest()), kind, follows, overrides, mode);
+        var list = commits.ToList();
+        yield return SyncArgs.Number(list.Count);
+        foreach (var commit in list)
+        {
+            yield return SyncArgs.Player(commit.Player);
+            yield return SyncArgs.Number(commit.Choice.Count);
+            foreach (var item in commit.Choice.Items)
+            {
+                yield return format(item);
+            }
+
+            yield return SyncArgs.Number(commit.Sequence);
+            yield return commit.Kind.ToString();
+            yield return commit.Follows is { } follows ? SyncArgs.Number(follows) : "";
+            yield return SyncArgs.Flag(commit.Overrides);
+            yield return commit.Mode.ToString();
+            yield return SyncArgs.Number(commit.Link.Parts.Count);
+            foreach (var part in commit.Link.Parts)
+            {
+                yield return part;
+            }
+        }
+    }
+
+    public static List<Commit<TAtom>> Decode<TAtom>(ArgReader reader, Func<string, TAtom> parse)
+        where TAtom : notnull
+    {
+        var count = reader.Count();
+        var commits = new List<Commit<TAtom>>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var player = reader.Player();
+            var choice = new Selection<TAtom>(reader.Strings(reader.Count()).Select(parse));
+            var sequence = reader.Int();
+            var kind = reader.Enum<CommitKind>();
+            var follows = reader.OptionalInt();
+            var overrides = reader.Bool();
+            var mode = reader.Enum<LinkMode>();
+            var link = new LinkKey(reader.Strings(reader.Count()));
+            commits.Add(new Commit<TAtom>(sequence, player, choice, link, kind, follows, overrides, mode));
+        }
+
+        return commits;
     }
 }

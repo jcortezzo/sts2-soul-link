@@ -20,15 +20,40 @@ internal static class CardRewardTrackingPatches
 {
     [HarmonyPatch(typeof(NRewardsScreen), nameof(NRewardsScreen.ShowScreen))]
     [HarmonyPostfix]
-    private static void TrackRewardsSet(RewardsSet set) => CardRewardLinks.ShowSet(set);
+    private static void TrackRewardsSet(RewardsSet set, NRewardsScreen? __result)
+    {
+        CardRewardLinks.ShowSet(set);
+        if (__result is not null && LocalContext.IsMe(set.Player))
+        {
+            CardRewardExecutor.TrackRewardsScreen(__result);
+        }
+    }
 
     [HarmonyPatch(typeof(CardReward), "OnSelect")]
     [HarmonyPrefix]
-    private static void JoinCardReward(CardReward __instance) => CardRewardLinks.Open(__instance);
+    private static void JoinCardReward(CardReward __instance)
+    {
+        CardRewardLinks.Open(__instance);
+        if (LocalContext.IsMe(__instance.Player))
+        {
+            CardRewardExecutor.OnOpened(__instance);
+        }
+    }
 
+    /// <summary>The executor checks for picks whenever a card reward screen opens or closes.</summary>
     [HarmonyPatch(typeof(NCardRewardSelectionScreen), nameof(NCardRewardSelectionScreen.ShowScreen))]
     [HarmonyPostfix]
-    private static void TrackScreen(NCardRewardSelectionScreen __result) => LockView.Show(__result);
+    private static void TrackScreen(NCardRewardSelectionScreen? __result)
+    {
+        if (__result is null)
+        {
+            return;
+        }
+
+        LockView.Show(__result);
+        __result.TreeExited += CardRewardExecutor.Schedule;
+        CardRewardExecutor.Schedule();
+    }
 
     /// <summary>The screen rebuilds its cards when it opens and after a reroll, so the indicator has to be reapplied.</summary>
     [HarmonyPatch(typeof(NCardRewardSelectionScreen), nameof(NCardRewardSelectionScreen.RefreshOptions))]
@@ -65,7 +90,10 @@ internal static class CardRewardTrackingPatches
     }
 }
 
-/// <summary>Holds card reward picks until the host accepts them, so the first click decides.</summary>
+/// <summary>
+/// Sends card reward clicks to the host instead of letting the game act on them: a vote with everyone agrees, a pick
+/// with first click. <see cref="CardRewardExecutor"/> then does whatever the host commits.
+/// </summary>
 [HarmonyPatch]
 internal static class CardRewardGatePatches
 {
@@ -87,8 +115,9 @@ internal static class CardRewardGatePatches
             return true;
         }
 
-        var ops = CardRewardLinks.JoinOps(reward).Append(CardRewardLinks.Commit(table, CardRewardLinks.KeyOfCard(options, index))).ToList();
-        return ClickGate.Request(__instance, ops, () => RewardAccess.SelectCard(__instance, cardHolder));
+        var key = CardRewardLinks.KeyOfCard(options, index);
+        return CardRewardExecutor.TakeCommittedClick(__instance, table, key)
+            || ClickGate.Request(CardRewardLinks.JoinOps(reward).Append(CardRewardLinks.Choose(table, key)).ToList());
     }
 
     [HarmonyPatch(typeof(NCardRewardSelectionScreen), "OnAlternateRewardSelected")]
@@ -108,12 +137,13 @@ internal static class CardRewardGatePatches
             return true;
         }
 
-        var ops = CardRewardLinks.JoinOps(reward).Append(CardRewardLinks.Commit(table, key)).ToList();
-        return ClickGate.Request(__instance, ops, () => RewardAccess.SelectAlternative(__instance, index));
+        return CardRewardExecutor.TakeCommittedClick(__instance, table, key)
+            || ClickGate.Request(CardRewardLinks.JoinOps(reward).Append(CardRewardLinks.Choose(table, key)).ToList());
     }
 
     /// <summary>
     /// Leaving the rewards screen skips every card reward the player didn't take, so it's linked like pressing Skip.
+    /// The player leaves once every card reward is done: at once with first click, or once everyone agrees.
     /// </summary>
     [HarmonyPatch(typeof(NRewardsScreen), "OnProceedButtonPressed")]
     [HarmonyPrefix]
@@ -122,7 +152,8 @@ internal static class CardRewardGatePatches
         if (ClickGate.TryConsumeApproval(__instance)
             || RewardAccess.RewardsSet(__instance) is not { } set
             || !LocalContext.IsMe(set.Player)
-            || !ReferenceEquals(set, CardRewardLinks.CurrentSet))
+            || !ReferenceEquals(set, CardRewardLinks.CurrentSet)
+            || SoulLinkSession.Current is not { Run: not null } session)
         {
             return true;
         }
@@ -130,16 +161,40 @@ internal static class CardRewardGatePatches
         var ops = new List<GatedOp>();
         foreach (var reward in set.Rewards.OfType<CardReward>().Where(reward => !reward.SuccessfullySelected))
         {
-            if (CardRewardLinks.TableId(reward) is not { } table || IsDecided(table))
+            if (CardRewardLinks.TableId(reward) is not { } table)
+            {
+                continue;
+            }
+
+            // Skip again on a reward already voted as skipped would take the vote back.
+            var decision = CardRewardLinks.ScreenOf(table)?.Decision;
+            if (decision is not null && (decision.HasDecided(session.Me) || decision.VoteOf(session.Me)?.Contains(CardRewardKeys.Skip) == true))
             {
                 continue;
             }
 
             ops.AddRange(CardRewardLinks.JoinOps(reward));
-            ops.Add(CardRewardLinks.Commit(table, CardRewardKeys.Skip));
+            ops.Add(CardRewardLinks.Choose(table, CardRewardKeys.Skip));
         }
 
-        return ClickGate.Request(__instance, ops, () => RewardAccess.Proceed(__instance, __0));
+        if (ops.Count == 0 && CardRewardExecutor.IsDone(set))
+        {
+            return true;
+        }
+
+        CardRewardExecutor.ProceedWhenDone(__instance, __0);
+        if (ops.Count > 0)
+        {
+            ClickGate.Request(ops, accepted =>
+            {
+                if (!accepted)
+                {
+                    CardRewardExecutor.CancelProceed();
+                }
+            });
+        }
+
+        return false;
     }
 
     private static int IndexOf(IReadOnlyList<CardCreationResult> options, NCardHolder holder)
@@ -155,9 +210,4 @@ internal static class CardRewardGatePatches
         return -1;
     }
 
-    private static bool IsDecided(string table) =>
-        SoulLinkSession.Current is { } session
-        && session.State.Find<SoulLink.Core.Sync.RewardTable>(table)?.Screen.Decision is { } decision
-        && decision.IsParticipant(session.Me)
-        && decision.HasDecided(session.Me);
 }

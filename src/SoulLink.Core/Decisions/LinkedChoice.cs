@@ -24,6 +24,12 @@ namespace SoulLink.Core.Decisions;
 /// A separate option, like Pael's Wing's sacrifice, is linked only among the players who have it: in both modes it can
 /// be taken instead of following and is never greyed out because others lack it.
 /// </para>
+/// <para>
+/// Players act through <see cref="Choose"/>, and <see cref="WhoDecides"/> sets what a click does. With first click, it
+/// commits the choice and makes the same choice for every bound player who has nothing they could take instead. With
+/// everyone agrees, it's a vote, and a choice is committed once everyone who could take it has voted for it. Both
+/// build on the same commits and bindings.
+/// </para>
 /// </remarks>
 /// <typeparam name="TAtom">One pickable option, like an <see cref="OptionKey"/> or a card.</typeparam>
 public abstract class LinkedChoice<TAtom>
@@ -32,17 +38,45 @@ public abstract class LinkedChoice<TAtom>
     private readonly List<PlayerId> _participants = [];
     private readonly List<Commit<TAtom>> _commits = [];
     private readonly Dictionary<PlayerId, Commit<TAtom>> _decided = new();
+    private readonly Dictionary<PlayerId, Vote> _votes = new();
     private LinkMode? _lockedMode;
+    private int _voteSequence;
 
-    protected LinkedChoice(LinkMode mode, int pickCount)
+    protected LinkedChoice(LinkMode mode, int pickCount, WhoDecides whoDecides)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(pickCount, 1);
         Mode = mode;
         PickCount = pickCount;
+        WhoDecides = whoDecides;
     }
 
     /// <summary>The mode from the settings.</summary>
     public LinkMode Mode { get; }
+
+    /// <summary>Whether a click is a vote that everyone has to agree on, or a commit that decides at once.</summary>
+    public WhoDecides WhoDecides { get; }
+
+    /// <summary>
+    /// With first click, whether the same choice is made for bound players automatically. Off for decisions whose
+    /// choice isn't a single action, like a campfire category, where everyone still picks an option within it.
+    /// </summary>
+    public bool FollowsAutomatically { get; init; } = true;
+
+    /// <summary>
+    /// Players who can't act yet but will, like a Driftwood holder who owes a reroll. Nothing is chosen for them
+    /// automatically, and an agreement they could join waits for them.
+    /// </summary>
+    public Func<PlayerId, bool>? IsHeld { get; set; }
+
+    /// <summary>
+    /// Players who may not take part, like a player who could Smith but hasn't chosen Smith. They still count for
+    /// mean mode, but nothing is chosen for them automatically and agreements don't wait for them.
+    /// </summary>
+    public Func<PlayerId, bool>? IsProspect { get; set; }
+
+    /// <summary>Each undecided player's current vote, with everyone agrees.</summary>
+    public IReadOnlyDictionary<PlayerId, Selection<TAtom>> Votes =>
+        _votes.ToDictionary(entry => entry.Key, entry => entry.Value.Choice);
 
     /// <summary>How many options each player picks: 1 for most decisions, more for "choose N" screens.</summary>
     public int PickCount { get; }
@@ -89,6 +123,125 @@ public abstract class LinkedChoice<TAtom>
 
     /// <summary>The player's commit, or null if they haven't committed.</summary>
     public Commit<TAtom>? CommitOf(PlayerId player) => _decided.GetValueOrDefault(player);
+
+    /// <summary>The player's current vote, or null.</summary>
+    public Selection<TAtom>? VoteOf(PlayerId player) => _votes.TryGetValue(player, out var vote) ? vote.Choice : null;
+
+    /// <summary>
+    /// The other players whose votes, matched to this player's options, include this option, in vote order. Shows who
+    /// is waiting on whom.
+    /// </summary>
+    public IReadOnlyList<PlayerId> VotersFor(PlayerId player, TAtom option)
+    {
+        RequireParticipant(player);
+        return _votes
+            .Where(entry => entry.Key != player)
+            .OrderBy(entry => entry.Value.Sequence)
+            .Where(entry => TryResolve(Describe(entry.Key, entry.Value.Choice), player, out var mine) && mine.Contains(option))
+            .Select(entry => entry.Key)
+            .ToList();
+    }
+
+    /// <summary>Takes back a player's vote, for example when their options change.</summary>
+    public void ClearVote(PlayerId player) => _votes.Remove(player);
+
+    /// <summary>
+    /// A player's click. With first click, it commits the choice and then makes the same choice for everyone who has to
+    /// follow. With everyone agrees, it becomes the player's vote, replacing any earlier one, or takes the vote back if
+    /// it's the same choice again; the choice is committed once everyone who can take it has voted for it.
+    /// </summary>
+    /// <returns>The commits made, in order. Empty while a vote waits for the others.</returns>
+    /// <exception cref="InvalidOperationException">The choice isn't allowed; see <see cref="CanCommit"/>.</exception>
+    public IReadOnlyList<Commit<TAtom>> Choose(PlayerId player, Selection<TAtom> choice)
+    {
+        var check = CanCommit(player, choice);
+        if (!check.IsAllowed)
+        {
+            throw new InvalidOperationException($"{player} can't choose {choice}: {check}.");
+        }
+
+        if (WhoDecides == WhoDecides.FirstClick)
+        {
+            var commits = new List<Commit<TAtom>> { Commit(player, choice) };
+            commits.AddRange(Settle());
+            return commits;
+        }
+
+        RecordVote(player, choice);
+        return Settle();
+    }
+
+    /// <summary>
+    /// Re-checks the decision after players join, options change or a held player can act: first click makes the same
+    /// choice for newly bound players, and everyone agrees commits any agreement that's now complete.
+    /// </summary>
+    /// <returns>The commits made, in order.</returns>
+    public IReadOnlyList<Commit<TAtom>> Settle()
+    {
+        var commits = new List<Commit<TAtom>>();
+        while (true)
+        {
+            var made = WhoDecides == WhoDecides.FirstClick ? FollowOnce() : AgreeOnce();
+            if (made.Count == 0)
+            {
+                return commits;
+            }
+
+            commits.AddRange(made);
+        }
+    }
+
+    /// <summary>Replays a host click on a client: records the vote with everyone agrees, then applies the host's commits.</summary>
+    public void ApplyChoice(PlayerId player, Selection<TAtom> choice, IReadOnlyList<Commit<TAtom>> commits)
+    {
+        ArgumentNullException.ThrowIfNull(choice);
+        ArgumentNullException.ThrowIfNull(commits);
+        if (WhoDecides == WhoDecides.EveryoneAgrees && IsParticipant(player) && !_decided.ContainsKey(player))
+        {
+            RecordVote(player, choice);
+        }
+
+        ApplyAll(commits);
+    }
+
+    /// <summary>
+    /// Applies commits the host made, in order, then drops votes that stopped being possible, as the host's settle
+    /// did. Used by clients after joins, option changes and clicks.
+    /// </summary>
+    public void ApplyAll(IReadOnlyList<Commit<TAtom>> commits)
+    {
+        ArgumentNullException.ThrowIfNull(commits);
+        foreach (var commit in commits)
+        {
+            Apply(commit);
+        }
+
+        DropImpossibleVotes();
+    }
+
+    /// <summary>
+    /// With first click, the choice made automatically for the player: what they're bound to, unless they could take an
+    /// exclusive extra or a separate option instead, in which case they choose. Null for unbound or held players.
+    /// </summary>
+    public Selection<TAtom>? AutoFollowChoice(PlayerId player)
+    {
+        if (!FollowsAutomatically || !IsParticipant(player) || _decided.ContainsKey(player) || Waits(player)
+            || FindBinding(player) is not { } binding)
+        {
+            return null;
+        }
+
+        var mode = EffectiveMode;
+        foreach (var option in Options(player))
+        {
+            if (!binding.Required.Contains(option) && IsAvailable(player, option) && CanTakeInstead(Selection.Of(option), mode))
+            {
+                return null;
+            }
+        }
+
+        return binding.Required;
+    }
 
     /// <summary>Whether the player is free, bound or decided.</summary>
     public ChoiceStatus<TAtom> StatusOf(PlayerId player)
@@ -233,6 +386,7 @@ public abstract class LinkedChoice<TAtom>
     {
         _participants.Remove(player);
         _decided.Remove(player);
+        _votes.Remove(player);
     }
 
     /// <summary>Every option this player sees, available or not, in display order.</summary>
@@ -283,6 +437,111 @@ public abstract class LinkedChoice<TAtom>
         _lockedMode ??= commit.Mode;
         _commits.Add(commit);
         _decided[commit.Player] = commit;
+        _votes.Remove(commit.Player);
+    }
+
+    private void RecordVote(PlayerId player, Selection<TAtom> choice)
+    {
+        if (_votes.TryGetValue(player, out var current) && current.Choice.Equals(choice))
+        {
+            _votes.Remove(player);
+            return;
+        }
+
+        _votes[player] = new Vote(choice, ++_voteSequence);
+    }
+
+    /// <summary>First click: commits the required choice for every bound player who has to follow automatically.</summary>
+    private List<Commit<TAtom>> FollowOnce()
+    {
+        var commits = new List<Commit<TAtom>>();
+        foreach (var player in _participants.ToList())
+        {
+            if (AutoFollowChoice(player) is { } choice && CanCommit(player, choice).IsAllowed)
+            {
+                commits.Add(Commit(player, choice));
+            }
+        }
+
+        return commits;
+    }
+
+    /// <summary>Whether nothing may be chosen for the player automatically: they're held or a prospect.</summary>
+    private bool Waits(PlayerId player) => IsHeld?.Invoke(player) == true || IsProspect?.Invoke(player) == true;
+
+    /// <summary>Drops votes that stopped being possible, for example because the player's options changed.</summary>
+    private void DropImpossibleVotes()
+    {
+        foreach (var (voter, vote) in _votes.ToList())
+        {
+            if (!Waits(voter) && !CanCommit(voter, vote.Choice).IsAllowed)
+            {
+                _votes.Remove(voter);
+            }
+        }
+    }
+
+    /// <summary>Everyone agrees: commits the first complete agreement, in vote order, so the first voter leads it.</summary>
+    private List<Commit<TAtom>> AgreeOnce()
+    {
+        DropImpossibleVotes();
+        foreach (var (voter, vote) in _votes.OrderBy(entry => entry.Value.Sequence).ToList())
+        {
+            if (Waits(voter) || AgreeingGroup(voter, vote.Choice) is not { } group)
+            {
+                continue;
+            }
+
+            var commits = new List<Commit<TAtom>>();
+            foreach (var (member, choice) in group)
+            {
+                if (CanCommit(member, choice).IsAllowed)
+                {
+                    commits.Add(Commit(member, choice));
+                }
+            }
+
+            return commits;
+        }
+
+        return [];
+    }
+
+    /// <summary>
+    /// Everyone who has to agree on a choice, with what each of them has to pick, in vote order; or null while anyone
+    /// who could take it hasn't voted for it, including held players. Players who can't take it, like players bound
+    /// to something else, prospects, and players voting for an exclusive extra or a separate option instead aren't
+    /// part of it.
+    /// </summary>
+    private List<(PlayerId Player, Selection<TAtom> Choice)>? AgreeingGroup(PlayerId voter, Selection<TAtom> choice)
+    {
+        var link = Describe(voter, choice);
+        var takesInstead = IsExclusive(choice) || IsSeparate(choice);
+        var group = new List<(PlayerId Player, Selection<TAtom> Choice, int Sequence)>();
+        foreach (var player in _participants)
+        {
+            if (_decided.ContainsKey(player) || IsProspect?.Invoke(player) == true || !TryFollow(link, choice.Count, player, out var required)
+                || (player != voter && !CanCommit(player, required).IsAllowed))
+            {
+                continue;
+            }
+
+            if (IsHeld?.Invoke(player) == true || !_votes.TryGetValue(player, out var vote))
+            {
+                return null;
+            }
+
+            if (vote.Choice.Equals(required))
+            {
+                group.Add((player, required, vote.Sequence));
+            }
+            else if (takesInstead || !(IsExclusive(vote.Choice) || IsSeparate(vote.Choice)))
+            {
+                return null;
+            }
+        }
+
+        return group.OrderBy(member => member.Sequence).Select(member => (member.Player, member.Choice)).ToList();
     }
 
     private Binding<TAtom>? FindBinding(PlayerId player)
@@ -398,4 +657,6 @@ public abstract class LinkedChoice<TAtom>
 
         return new OptionView<TAtom>(option, OptionState.Open);
     }
+
+    private sealed record Vote(Selection<TAtom> Choice, int Sequence);
 }

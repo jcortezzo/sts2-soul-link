@@ -22,7 +22,7 @@ public sealed class SyncState
     public static IReadOnlyList<string> StartArgs(SoulLinkSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        return [settings.CardMatching.ToString(), settings.Mode.ToString(), SyncArgs.Flag(settings.SharedDeath)];
+        return [settings.CardMatching.ToString(), settings.Mode.ToString(), SyncArgs.Flag(settings.SharedDeath), settings.WhoDecides.ToString()];
     }
 
     /// <summary>The open table with this id, if it exists and has this type.</summary>
@@ -101,13 +101,14 @@ public sealed class SyncState
     private static ISyncTable? Create(SyncOp op, SoulLinkRun run)
     {
         var mode = run.Settings.Mode;
+        var whoDecides = run.Settings.WhoDecides;
         return op.Action switch
         {
-            SyncActions.OptionsJoin => new OptionTable(op.Table, mode, FirstNumber(op)),
-            SyncActions.CardsJoin => new CardTable(op.Table, run.Matching, mode, FirstNumber(op)),
-            SyncActions.RewardJoin => new RewardTable(op.Table, FirstNumber(op), mode),
-            SyncActions.ShopEnter => new ShopTable(op.Table, mode, run.Matching),
-            SyncActions.CampfireJoin => new CampfireTable(op.Table, mode, run.Matching),
+            SyncActions.OptionsJoin => new OptionTable(op.Table, mode, FirstNumber(op), whoDecides),
+            SyncActions.CardsJoin => new CardTable(op.Table, run.Matching, mode, FirstNumber(op), whoDecides),
+            SyncActions.RewardJoin => new RewardTable(op.Table, FirstNumber(op), mode, whoDecides),
+            SyncActions.ShopEnter => new ShopTable(op.Table, mode, run.Matching, whoDecides),
+            SyncActions.CampfireJoin => new CampfireTable(op.Table, mode, run.Matching, whoDecides),
             _ => null,
         };
     }
@@ -121,7 +122,7 @@ public sealed class SyncState
     private void Start(SyncOp op)
     {
         var args = new ArgReader(op.Args);
-        var settings = new SoulLinkSettings(args.Enum<CardMatching>(), args.Enum<LinkMode>(), args.Bool());
+        var settings = new SoulLinkSettings(args.Enum<CardMatching>(), args.Enum<LinkMode>(), args.Bool(), args.Enum<WhoDecides>());
         args.End();
         Run = new SoulLinkRun(settings);
         _tables.Clear();

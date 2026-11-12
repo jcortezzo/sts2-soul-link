@@ -57,10 +57,14 @@ public sealed class SyncRejectedException : Exception
     }
 }
 
-/// <summary>The actions tables understand. The part before the dot names the kind of table.</summary>
+/// <summary>
+/// The actions tables understand. The part before the dot names the kind of table. A choose action is a player's
+/// click: with first click it commits at once, and with everyone agrees it's a vote. The host's notice for any action
+/// on a linked decision carries the commits that followed from it, for every player.
+/// </summary>
 public static class SyncActions
 {
-    /// <summary>Host only: starts the run with the host's settings. Args: card matching, mode, shared death.</summary>
+    /// <summary>Host only: starts the run with the host's settings. Args: card matching, mode, shared death, who decides.</summary>
     public const string RunStart = "run.start";
 
     /// <summary>Joins an option decision. Args: pick count, then key and availability pairs.</summary>
@@ -69,8 +73,8 @@ public static class SyncActions
     /// <summary>Replaces the player's options. Args: key and availability pairs.</summary>
     public const string OptionsUpdate = "options.update";
 
-    /// <summary>Commits options. Args: the keys.</summary>
-    public const string OptionsCommit = "options.commit";
+    /// <summary>Clicks options. Args: the keys.</summary>
+    public const string OptionsChoose = "options.choose";
 
     /// <summary>Leaves an option decision.</summary>
     public const string OptionsLeave = "options.leave";
@@ -78,8 +82,8 @@ public static class SyncActions
     /// <summary>Joins a card choice. Args: pick count, then card id and eligibility pairs in screen order.</summary>
     public const string CardsJoin = "cards.join";
 
-    /// <summary>Commits cards. Args: the card ids.</summary>
-    public const string CardsCommit = "cards.commit";
+    /// <summary>Clicks cards. Args: the card ids.</summary>
+    public const string CardsChoose = "cards.choose";
 
     /// <summary>Leaves a card choice.</summary>
     public const string CardsLeave = "cards.leave";
@@ -87,8 +91,8 @@ public static class SyncActions
     /// <summary>Joins a card reward screen. Args: screen number, card count, can reroll, can sacrifice, then extra sources.</summary>
     public const string RewardJoin = "reward.join";
 
-    /// <summary>Commits a card reward pick. Args: the option key.</summary>
-    public const string RewardCommit = "reward.commit";
+    /// <summary>Clicks a card reward option. Args: the option key.</summary>
+    public const string RewardChoose = "reward.choose";
 
     /// <summary>Rerolls a card reward screen. Args: the new offer, as for <see cref="RewardJoin"/>.</summary>
     public const string RewardReroll = "reward.reroll";
@@ -96,7 +100,7 @@ public static class SyncActions
     /// <summary>Enters a shop. Args: gold, free potion slots, then slot kind, number, price and stock for each item.</summary>
     public const string ShopEnter = "shop.enter";
 
-    /// <summary>Buys a slot. Args: slot kind and number.</summary>
+    /// <summary>Clicks a slot to buy it. Args: slot kind and number.</summary>
     public const string ShopBuy = "shop.buy";
 
     /// <summary>Updates gold and free potion slots from the game. Args: gold, free potion slots.</summary>
@@ -105,8 +109,8 @@ public static class SyncActions
     /// <summary>Joins the card removal target choice. Args: card id and eligibility pairs in screen order.</summary>
     public const string ShopRemovalJoin = "shop.removal-join";
 
-    /// <summary>Commits the card to remove. Args: the card id.</summary>
-    public const string ShopRemovalCommit = "shop.removal-commit";
+    /// <summary>Clicks the card to remove. Args: the card id.</summary>
+    public const string ShopRemovalChoose = "shop.removal-choose";
 
     /// <summary>
     /// Arrives at a campfire. Args: has Miniature Tent, option count, option id and availability pairs, then card id
@@ -114,9 +118,9 @@ public static class SyncActions
     /// </summary>
     public const string CampfireJoin = "campfire.join";
 
-    /// <summary>Chooses a campfire option. Args: the option id.</summary>
+    /// <summary>Clicks a campfire option. Args: the option id.</summary>
     public const string CampfireChoose = "campfire.choose";
 
-    /// <summary>Commits the card to Smith. Args: the card id.</summary>
+    /// <summary>Clicks the card to Smith. Args: the card id.</summary>
     public const string CampfireSmith = "campfire.smith";
 }

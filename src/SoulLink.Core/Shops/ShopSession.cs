@@ -9,27 +9,41 @@ namespace SoulLink.Core.Shops;
 /// <remarks>
 /// <para>
 /// Nice: when anyone buys a slot on their own, everyone else who can buy that slot must buy it. The purchase is
-/// owed until the party leaves, and its price is set aside from the debtor's gold so later purchases can't make it
+/// owed until it's paid, and its price is set aside from the debtor's gold so later purchases can't make it
 /// unaffordable: earlier purchases get first claim on gold.
 /// </para>
 /// <para>
 /// Mean: a slot can only be bought on your own if everyone else can buy theirs too, so every purchase binds everyone.
 /// </para>
 /// <para>Not buying isn't a decision, so it binds no one.</para>
+/// <para>
+/// Players act through <see cref="Choose"/>. With first click, a click buys the slot and pays what everyone else now
+/// owes at once. With everyone agrees, a click is a vote, and the slot is bought once everyone who can buy it has
+/// voted for it.
+/// </para>
 /// </remarks>
 public sealed class ShopSession
 {
     private readonly Dictionary<PlayerId, Shopper> _shoppers = new();
     private readonly List<PlayerId> _order = [];
     private readonly List<Purchase> _purchases = [];
+    private readonly Dictionary<(PlayerId Player, ShopSlot Slot), int> _votes = new();
+    private int _voteSequence;
 
-    public ShopSession(LinkMode mode, ICardMatchingStrategy matching)
+    /// <param name="mode">Nice or mean, from the settings.</param>
+    /// <param name="matching">How card removal targets are matched.</param>
+    /// <param name="whoDecides">Whether everyone has to agree, or the first click decides.</param>
+    public ShopSession(LinkMode mode, ICardMatchingStrategy matching, WhoDecides whoDecides = WhoDecides.EveryoneAgrees)
     {
         Mode = mode;
-        RemovalTarget = new CardChoiceDecision(matching, mode);
+        WhoDecides = whoDecides;
+        RemovalTarget = new CardChoiceDecision(matching, mode, 1, whoDecides);
     }
 
     public LinkMode Mode { get; }
+
+    /// <summary>Whether a click is a vote that everyone has to agree on, or a purchase that decides at once.</summary>
+    public WhoDecides WhoDecides { get; }
 
     /// <summary>The players in the shop, in the order they entered.</summary>
     public IReadOnlyList<PlayerId> Shoppers => _order;
@@ -97,6 +111,64 @@ public sealed class ShopSession
     public bool CanLeave(PlayerId player) => Get(player).Owed.Count == 0;
 
     public bool HasBought(PlayerId player, ShopSlot slot) => Get(player).Bought.Contains(slot);
+
+    /// <summary>The slots the player has voted to buy, in vote order.</summary>
+    public IReadOnlyList<ShopSlot> VotesOf(PlayerId player) =>
+        _votes.Where(vote => vote.Key.Player == player).OrderBy(vote => vote.Value).Select(vote => vote.Key.Slot).ToList();
+
+    /// <summary>The players who have voted to buy the slot, in vote order.</summary>
+    public IReadOnlyList<PlayerId> VotersFor(ShopSlot slot) =>
+        _votes.Where(vote => vote.Key.Slot == slot).OrderBy(vote => vote.Value).Select(vote => vote.Key.Player).ToList();
+
+    /// <summary>
+    /// A player's click on a slot. With first click, it buys the slot, then everyone who now owes it buys theirs. With
+    /// everyone agrees, it becomes one of the player's votes, or takes the vote back if they already voted for the
+    /// slot; the slot is bought once everyone who can buy it has voted for it.
+    /// </summary>
+    /// <returns>The purchases made, in order. Empty while a vote waits for the others.</returns>
+    /// <exception cref="InvalidOperationException">The purchase isn't allowed; see <see cref="CanBuy"/>.</exception>
+    public IReadOnlyList<Purchase> Choose(PlayerId player, ShopSlot slot)
+    {
+        var check = CanBuy(player, slot);
+        if (!check.IsAllowed)
+        {
+            throw new InvalidOperationException($"{player} can't buy {slot}: {check}.");
+        }
+
+        if (WhoDecides == WhoDecides.FirstClick)
+        {
+            var purchases = new List<Purchase> { Buy(player, slot) };
+            purchases.AddRange(Settle());
+            return purchases;
+        }
+
+        if (!_votes.Remove((player, slot)))
+        {
+            _votes[(player, slot)] = ++_voteSequence;
+        }
+
+        return Settle();
+    }
+
+    /// <summary>
+    /// Re-checks the shop after gold, potion slots or the party changed: first click pays any obligation that can be
+    /// paid, and everyone agrees buys any slot that's now agreed.
+    /// </summary>
+    /// <returns>The purchases made, in order.</returns>
+    public IReadOnlyList<Purchase> Settle()
+    {
+        var purchases = new List<Purchase>();
+        while (true)
+        {
+            var made = WhoDecides == WhoDecides.FirstClick ? PayObligations() : BuyAgreedSlot();
+            if (made.Count == 0)
+            {
+                return purchases;
+            }
+
+            purchases.AddRange(made);
+        }
+    }
 
     /// <summary>Checks whether the player may buy the slot now.</summary>
     public PurchaseCheck CanBuy(PlayerId player, ShopSlot slot)
@@ -174,6 +246,55 @@ public sealed class ShopSession
     }
 
     private static bool IsSettled(Shopper shopper, ShopSlot slot) => shopper.Bought.Contains(slot) || shopper.Owes(slot);
+
+    /// <summary>First click: buys everything players owe that they can pay now, oldest obligation first.</summary>
+    private List<Purchase> PayObligations()
+    {
+        var purchases = new List<Purchase>();
+        foreach (var obligation in _order.SelectMany(player => _shoppers[player].Owed).OrderBy(obligation => obligation.Sequence).ToList())
+        {
+            if (CanBuy(obligation.Debtor, obligation.Slot).IsAllowed)
+            {
+                purchases.Add(Buy(obligation.Debtor, obligation.Slot));
+            }
+        }
+
+        return purchases;
+    }
+
+    /// <summary>
+    /// Everyone agrees: buys the first slot, in vote order, that everyone who can buy it has voted for. The first
+    /// voter's purchase leads, so the others pay what it makes them owe. Votes that stopped being possible, for
+    /// example because the player spent their gold, are dropped.
+    /// </summary>
+    private List<Purchase> BuyAgreedSlot()
+    {
+        foreach (var ((voter, slot), _) in _votes.OrderBy(vote => vote.Value).ToList())
+        {
+            if (!CanBuy(voter, slot).IsAllowed)
+            {
+                _votes.Remove((voter, slot));
+                continue;
+            }
+
+            var buyers = _order.Where(player => Affordability(_shoppers[player], slot) == PurchaseVerdict.Allowed).ToList();
+            if (!buyers.TrueForAll(player => _votes.ContainsKey((player, slot))))
+            {
+                continue;
+            }
+
+            var purchases = new List<Purchase>();
+            foreach (var buyer in buyers.OrderBy(player => _votes[(player, slot)]))
+            {
+                _votes.Remove((buyer, slot));
+                purchases.Add(Buy(buyer, slot));
+            }
+
+            return purchases;
+        }
+
+        return [];
+    }
 
     /// <summary>Whether the shopper could buy the slot, setting aside gold and potion slots for everything else they owe.</summary>
     private static PurchaseVerdict Affordability(Shopper shopper, ShopSlot slot)

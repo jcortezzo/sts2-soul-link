@@ -55,12 +55,15 @@ public sealed class CardRewardRound
 {
     private readonly List<CardRewardScreen> _screens = [];
 
-    public CardRewardRound(LinkMode mode)
+    public CardRewardRound(LinkMode mode, WhoDecides whoDecides = WhoDecides.EveryoneAgrees)
     {
         Mode = mode;
+        WhoDecides = whoDecides;
     }
 
     public LinkMode Mode { get; }
+
+    public WhoDecides WhoDecides { get; }
 
     public IReadOnlyList<CardRewardScreen> Screens => _screens;
 
@@ -72,7 +75,7 @@ public sealed class CardRewardRound
         {
             if (i == _screens.Count)
             {
-                _screens.Add(new CardRewardScreen(i + 1, Mode));
+                _screens.Add(new CardRewardScreen(i + 1, Mode, WhoDecides));
             }
 
             _screens[i].Join(player, screens[i]);
@@ -98,11 +101,15 @@ public sealed class CardRewardScreen
 
     /// <param name="number">Which of each player's card rewards this is, counted from 1.</param>
     /// <param name="mode">Nice or mean, from the settings.</param>
-    public CardRewardScreen(int number, LinkMode mode)
+    /// <param name="whoDecides">Whether everyone has to agree, or the first click decides.</param>
+    public CardRewardScreen(int number, LinkMode mode, WhoDecides whoDecides = WhoDecides.EveryoneAgrees)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(number, 1);
         Number = number;
-        Decision = new OptionDecision(mode);
+        Decision = new OptionDecision(mode, 1, whoDecides);
+
+        // A player who owes a reroll can't pick, so nothing is picked for them until they've rerolled.
+        Decision.IsHeld = player => RerollsOwed(player) > 0;
     }
 
     /// <summary>Which of each player's card rewards this is, counted from 1.</summary>
@@ -126,13 +133,17 @@ public sealed class CardRewardScreen
     /// <exception cref="InvalidOperationException">The pick isn't allowed; see <see cref="CanCommit"/>.</exception>
     public Commit<OptionKey> Commit(PlayerId player, OptionKey option)
     {
-        var check = CanCommit(player, option);
-        if (!check.IsAllowed)
-        {
-            throw new InvalidOperationException($"{player} can't choose {option}: {check}.");
-        }
-
+        RequireAllowed(player, option);
         return Decision.Commit(player, option);
+    }
+
+    /// <summary>A player's click, decided by <see cref="OptionDecision.WhoDecides"/>; see <see cref="LinkedChoice{TAtom}.Choose"/>.</summary>
+    /// <returns>The commits made, in order.</returns>
+    /// <exception cref="InvalidOperationException">The pick isn't allowed; see <see cref="CanCommit"/>.</exception>
+    public IReadOnlyList<Commit<OptionKey>> Choose(PlayerId player, OptionKey option)
+    {
+        RequireAllowed(player, option);
+        return Decision.Choose(player, option);
     }
 
     /// <summary>How many rerolls the player has to make before picking.</summary>
@@ -141,7 +152,8 @@ public sealed class CardRewardScreen
     /// <summary>
     /// Records a reroll and the player's new offer. A reroll the player owed settles one debt. Any other reroll makes
     /// every other undecided player who can reroll owe one. A reroll isn't a commit: the first pick still decides
-    /// the slot.
+    /// the slot. The cards changed, so the votes of the player and of everyone who now owes a reroll are taken back.
+    /// Call <see cref="LinkedChoice{TAtom}.Settle"/> on <see cref="Decision"/> afterwards.
     /// </summary>
     /// <returns>The players who now owe a reroll.</returns>
     /// <exception cref="InvalidOperationException">The player already picked or can't reroll.</exception>
@@ -171,6 +183,7 @@ public sealed class CardRewardScreen
         }
 
         Decision.UpdateOptions(player, newOffer.ToOptions());
+        Decision.ClearVote(player);
         if (settlesDebt)
         {
             return [];
@@ -183,6 +196,7 @@ public sealed class CardRewardScreen
             if (other != player && otherState.CanReroll && !Decision.HasDecided(other))
             {
                 otherState.Owed.Add(player);
+                Decision.ClearVote(other);
                 owing.Add(other);
             }
         }
@@ -190,12 +204,24 @@ public sealed class CardRewardScreen
         return owing;
     }
 
-    /// <summary>Adds a player who has this screen, with what it offers them.</summary>
+    /// <summary>
+    /// Adds a player who has this screen, with what it offers them. Call <see cref="LinkedChoice{TAtom}.Settle"/> on
+    /// <see cref="Decision"/> afterwards, since a late player may follow an earlier pick.
+    /// </summary>
     public void Join(PlayerId player, CardRewardOffer offer)
     {
         ArgumentNullException.ThrowIfNull(offer);
         Decision.Join(player, offer.ToOptions());
         _rerolls[player] = new RerollState { CanReroll = offer.CanReroll };
+    }
+
+    private void RequireAllowed(PlayerId player, OptionKey option)
+    {
+        var check = CanCommit(player, option);
+        if (!check.IsAllowed)
+        {
+            throw new InvalidOperationException($"{player} can't choose {option}: {check}.");
+        }
     }
 
     private sealed class RerollState

@@ -1,5 +1,6 @@
 using BaseLib.Abstracts;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
+using MegaCrit.Sts2.Core.Platform;
 using SoulLink.Core;
 using SoulLink.Core.Sync;
 using SoulLink.SoulLinkCode.Net;
@@ -58,6 +59,26 @@ internal sealed class SoulLinkSession
 
     /// <summary>The run with the host's settings, once the host's start notice has arrived.</summary>
     public SoulLinkRun? Run => State.Run;
+
+    /// <summary>A player's name as the platform shows it, for the indicators.</summary>
+    public string NameOf(PlayerId player)
+    {
+        try
+        {
+            var name = PlatformUtil.GetPlayerNameRaw(_net.Platform, player.Value);
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                return name;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Names are only for the indicators, so a platform that can't name a player shouldn't break anything.
+            MainFile.Logger.Warn($"Soul Link couldn't look up a player's name: {ex.Message}");
+        }
+
+        return "Teammate";
+    }
 
     /// <summary>Starts a session for a new or loaded run. Single-player runs have no session.</summary>
     public static void Start(INetGameService net)

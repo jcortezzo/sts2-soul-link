@@ -4,11 +4,11 @@ This is the rules spec the mod implements, kept in the repo so the code and the 
 
 ## Overview
 
-In a co-op run, every out-of-combat decision is linked: the first player to choose sets the choice, and everyone who can make the same choice must. Combat, potions and the map stay free.
+In a co-op run, every out-of-combat decision is linked: everyone who can make the same choice makes it together. By default a choice is made once everyone who can make it has clicked it; a setting lets the first click decide for everyone instead. Combat, potions and the map stay free.
 
 - **Players:** 2 to 4, all running the mod.
 - **Linked:** card rewards, deck card choices (upgrade, remove, transform, enchant, duplicate), shop purchases, campfires, events, Ancients, relic rewards and chests.
-- **Settings** decide how strict it is: how cards are matched, what happens when someone can't follow (nice or mean), and whether one death ends the run.
+- **Settings** decide how strict it is: how cards are matched, what happens when someone can't follow (nice or mean), whether everyone has to agree, and whether one death ends the run.
 - **Origin:** our own rules, plus the campfire categories and linked cards from the [Slay the Soul-Link](https://docs.google.com/document/d/1XyDEOh4QqVfNqKOosRGrHEikjtB77w95TzjEURAe4lY/edit?tab=t.0) challenge by Rayditz and naturesbf, extended to 4 players and enforced by the mod.
 
 ## Settings
@@ -20,13 +20,13 @@ The host picks these before the run starts, and everyone plays under the same se
 | Card matching | Linked cards, Deck index | Linked cards | Which of your cards counts as "the same card" for upgrades, removals and other deck choices |
 | Mode | Nice, Mean | Nice | What happens when a linked choice isn't possible for everyone |
 | Shared death | Off, On | Off | Whether any player's death ends the run |
-| Who decides | First click | First click | Fixed for now; consensus could be added later as another option |
+| Who decides | Everyone agrees, First click | Everyone agrees | Whether a choice waits until everyone who can make it has clicked it, or the first click makes it for everyone |
 
 The card matching and mode defaults are proposals; see Proposed defaults and open items.
 
 ## How a linked decision resolves
 
-The first player to commit a choice decides it for everyone who can make the same choice. A commit is picking a card, pressing Skip, buying, choosing an option or confirming a selection; hovering doesn't count.
+A commit is picking a card, pressing Skip, buying, choosing an option or confirming a selection; hovering doesn't count. The first commit in a decision sets the choice for everyone who can make the same choice. These rules say who that is; [Who decides](#who-decides) says how clicks become commits.
 
 **Nice mode (whoever can)**
 
@@ -44,7 +44,26 @@ The first player to commit a choice decides it for everyone who can make the sam
 
 - **Can make the choice** means the option exists for you and the game would let you take it now: enough gold, not sold out, a free potion slot, an eligible card, not greyed out by the game.
 - **Players in a decision** are the ones facing it at that moment. For example, only players with a second card reward share the second reward screen.
-- **Ties:** if two commits land at nearly the same time, the host's order decides which came first.
+- **Ties:** if two clicks land at nearly the same time, the host's order decides which came first.
+
+## Who decides
+
+**Everyone agrees (default)**
+
+- A click is a vote. Clicking another option moves your vote, and clicking the same option again takes it back.
+- A choice is made once everyone who has to make it has clicked it, and then it's made for all of them at once. The first player to click it leads.
+- Nobody waits for players who can't make the choice, or for players who clicked an exclusive or separate option instead. In nice mode, players who can't make it then agree among themselves.
+- A Driftwood holder who owes a reroll can't vote yet, so a choice they could make waits for them to reroll and click.
+- In mean mode, greyed-out options can't be clicked, so every choice is everyone's.
+- Leaving the rewards screen clicks Skip on every card reward you didn't take, and you leave once everyone agrees.
+
+**First click**
+
+- The first click decides: the choice is made for the player who clicked and, at once, for everyone who has to follow it.
+- Players who could take something else instead, like an exclusive option or Pael's Wing's sacrifice, still choose for themselves.
+- A Driftwood holder who owes a reroll has the choice made for them once they reroll.
+
+Shops and campfires work the same way, with the details in their sections.
 
 ## Card rewards
 
@@ -54,7 +73,7 @@ Everyone takes the same slot, or everyone skips. Slots count left to right on ea
 - **Extra reward screens:** card reward screens are matched in order, and screen 2 is shared only by players who have a second one. This covers Prayer Wheel, Dream Catcher and [The Hunt](https://metabot.gg/en/slay-the-spire-2/card/the_hunt) (an extra card reward on a fatal hit). A screen only you have is yours to pick from freely, in both modes.
 - **Extra cards on a screen:** an extra card only some players have, like [Lasting Candy](https://metabot.gg/en/slay-the-spire-2/relic/lasting_candy)'s bonus Power every other combat, is an exclusive option. Nice: the holder may take it instead of following. Mean: it's greyed out unless everyone has one.
 - **Pael's Wing:** sacrificing is linked only among Pael's Wing holders, separately from the card pick. When a holder sacrifices, the other holders who haven't picked must sacrifice too, and players without Pael's Wing aren't affected. In both modes, a holder can sacrifice instead of following a card pick.
-- **Driftwood (proposed):** rerolls are linked among Driftwood holders. When one rerolls a screen, the other holders who can must reroll theirs. A reroll isn't a commit; the first pick still decides the slot.
+- **Driftwood (proposed):** rerolls are linked among Driftwood holders. When one rerolls a screen, the other holders who can must reroll theirs. A reroll isn't a commit, so it doesn't decide the slot.
 
 ## Deck card actions
 
@@ -89,14 +108,16 @@ Each shop slot is its own linked decision: every card, relic and potion, plus th
 
 - **Nice:** when anyone buys a slot, everyone else who can buy that slot must buy it. Purchases resolve in the order they were made, so earlier purchases get first claim on gold.
 - **Mean:** a slot can only be bought if every player can buy theirs at that moment; otherwise it's greyed out for everyone.
+- **Everyone agrees:** a slot is bought once everyone who can buy it has clicked it, for all of them at once. You can click several slots; a click you can no longer pay for is dropped, and clicks nobody agreed to end when the party leaves.
+- **First click:** buying a slot buys it at once for everyone else who can.
 - **Can't buy** means not enough gold, sold out, no free potion slot, or removal already used in this shop.
-- **Card removal:** the first buyer's chosen card sets the target, and everyone else removes their matching card (see Deck card actions).
-- **Timing (proposed):** purchase obligations last until the party leaves the shop. Not buying isn't a decision, so it binds no one.
+- **Card removal:** the removal buyers' chosen cards are a linked deck card action (see Deck card actions).
+- **Not buying** binds no one: nobody has to buy something because someone else didn't.
 - **Potions** bought here follow these rules, even though potions are otherwise free.
 
 ## Campfires
 
-The first player to choose at a campfire sets the category, and everyone else picks an option within it.
+The category is linked, and everyone picks their own option within it. With everyone agrees, your option happens once everyone has clicked an option in the same category. With first click, the first player's option sets the category for everyone else.
 
 | Category | Options |
 | --- | --- |
@@ -104,7 +125,7 @@ The first player to choose at a campfire sets the category, and everyone else pi
 | Improve | Smith, Dig, Cook, Lift, and any other option a relic or quest adds (proposed) |
 
 - **Within a category** you choose freely, and Mend's target is your choice.
-- **Smith targets:** if more than one player Smiths, the first Smith target decides (see Deck card actions).
+- **Smith targets:** if more than one player Smiths, the target is a linked deck card action among the players who chose Smith (see Deck card actions).
 - **Can't do the category:** nice, you choose freely; mean, that category was greyed out.
 - **[Miniature Tent](https://metabot.gg/en/slay-the-spire-2/relic/miniature_tent):** holders can choose any number of options, and their choices don't set the category for others. Anything a holder does that others also do still matches, like a Smith target.
 
@@ -113,7 +134,7 @@ The first player to choose at a campfire sets the category, and everyone else pi
 Everyone takes the same option slot, counted in the order each player sees the options. Players often see different options and outcomes in the same slot, and that's expected.
 
 - **Events:** each page of an event is its own decision. Events the game already puts to a group vote stay as they are.
-- **Multi-pick screens** like Room Full of Cheese (choose 2 of 8 commons): the first player to confirm sets the set of slots, and everyone else picks the same set.
+- **Multi-pick screens** like Room Full of Cheese (choose 2 of 8 commons): everyone picks the same set of slots.
 - **Card choices inside an event** (remove, transform, upgrade) follow Deck card actions.
 - **Ancients:** same slot.
 - **Relic rewards after fights:** taking or skipping is linked.
@@ -141,15 +162,15 @@ The mod shows what's linked before anyone clicks, so nobody has to count slots o
 
 - **Slot peek:** hover any slot (card reward, shop item, event option, Ancient choice, chest relic) to see what every other player has in that slot.
 - **Lock indicator:** after someone commits, your matching option is highlighted with their name. Options you can't take are disabled, with the reason.
+- **Votes:** with everyone agrees, each option shows who has clicked it, so you can see what everyone is waiting for.
 - **Free indicator:** in nice mode, shows when you're not bound and why.
 - **Linked-card view:** with linked cards, cards carry a link badge. Hover one to see its linked cards in every deck, and selection screens highlight your matching card.
 - **Index view:** with deck index, selection screens number the cards.
-- **Shop obligations:** a banner lists purchases you still owe, and who made you owe them.
 - **Run summary:** first clicks and deaths per player.
 
 ## Worked examples
 
-Each example is a scenario the mod must handle exactly this way, so each one becomes an acceptance test. The players are Ana, Ben and Cal.
+Each example is a scenario the mod must handle exactly this way, so each one becomes an acceptance test. The players are Ana, Ben and Cal. Examples 1 to 12 use first click; with everyone agrees, the same players are linked, and each choice is made once all of them have clicked it. Examples 13 to 15 use everyone agrees.
 
 1. **Card reward, nice.** Ana has a Lasting Candy extra Power; Ben and Cal have three cards each. Ben takes slot 2 first, so Cal must take slot 2. Ana may take slot 2 or her extra Power.
 2. **Card reward, mean.** Same screens. Ana's extra Power is greyed out. Ben takes slot 2, so Ana and Cal take slot 2.
@@ -163,6 +184,9 @@ Each example is a scenario the mod must handle exactly this way, so each one bec
 10. **Campfire with Miniature Tent.** Ana has Miniature Tent. Ben smiths first, so Cal must pick Smith, Dig, Cook or Lift. Ana can do every option; if she or Cal smith, their targets match Ben's.
 11. **Chest.** Ana picks relic 1, so Ben and Cal must pick relic 1. Rock-paper-scissors decides who gets it, and the others get the remaining relics.
 12. **Shared death on.** Cal dies in an elite fight. The run ends for everyone, even if Ana and Ben win the fight.
+13. **Card reward, everyone agrees.** Ana and Ben click slot 2 and Cal clicks Skip, so nothing is taken yet. When Cal switches to slot 2, all three take slot 2.
+14. **Shop, everyone agrees.** Ana and Ben click relic slot 2. Cal can't afford his, so nobody waits for him, and Ana and Ben buy theirs.
+15. **Campfire, everyone agrees.** Cal has Miniature Tent and rests right away. Ana clicks Rest and Ben clicks Smith, so neither happens yet. When Ana switches to Dig, both picked Improve: Ana digs and Ben smiths.
 
 ## Proposed defaults and open items
 
@@ -171,9 +195,8 @@ These fill gaps we haven't explicitly agreed on.
 - **Defaults:** Linked cards and Nice mode.
 - **Relics:** Driftwood rerolls are linked among holders.
 - **Links:** starters pair by name in deck order; transforming keeps a link; duplicating makes a new group.
-- **Shops:** purchase obligations last until the party leaves the shop.
 - **Campfires:** options added by relics or quests count as Improve.
-- **Ties:** the host's order decides simultaneous commits.
+- **Ties:** the host's order decides simultaneous clicks.
 - **Summary:** death counter and first clicks per player.
 - **Left out:** Slay the Soul-Link's random, different characters and must-take-the-first-multiplayer-card rules. Either could become a toggle later.
 - **Name:** an existing StS2 mod is already called [Soul Link](https://www.nexusmods.com/slaythespire2/mods/907) (shared HP, block and gold), so our Workshop name is open.

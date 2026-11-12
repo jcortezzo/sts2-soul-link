@@ -23,6 +23,27 @@ public class SoulLinkRunTests
         Assert.Equal(2, run.NewOptionDecision(pickCount: 2).PickCount);
     }
 
+    [Theory]
+    [InlineData(WhoDecides.EveryoneAgrees)]
+    [InlineData(WhoDecides.FirstClick)]
+    public void Decisions_use_the_who_decides_setting(WhoDecides whoDecides)
+    {
+        var run = new SoulLinkRun(SoulLinkSettings.Default with { WhoDecides = whoDecides });
+
+        Assert.Equal(whoDecides, run.NewOptionDecision().WhoDecides);
+        Assert.Equal(whoDecides, run.NewCardChoice().WhoDecides);
+        Assert.Equal(whoDecides, run.NewCardRewardRound().WhoDecides);
+        Assert.Equal(whoDecides, run.NewShop().WhoDecides);
+        Assert.Equal(whoDecides, run.NewCampfire().WhoDecides);
+        Assert.Equal(whoDecides, run.NewCampfire().SmithTarget.WhoDecides);
+    }
+
+    [Fact]
+    public void Everyone_agrees_is_the_default()
+    {
+        Assert.Equal(WhoDecides.EveryoneAgrees, SoulLinkSettings.Default.WhoDecides);
+    }
+
     [Fact]
     public void Starter_decks_are_linked_at_the_start()
     {

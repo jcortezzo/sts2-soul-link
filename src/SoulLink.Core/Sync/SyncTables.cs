@@ -42,24 +42,85 @@ public abstract class SyncTable : ISyncTable
 
     protected static SyncRejectedException Unknown(SyncOp op) => new($"{op.Action} doesn't apply to this table.");
 
-    /// <summary>Commits on the host, or applies the host's exact commit on a client.</summary>
-    protected static IReadOnlyList<string> CommitOrApply<TAtom>(
-        LinkedChoice<TAtom> decision, SyncOp op, Selection<TAtom> choice, IReadOnlyList<string>? replay)
+    /// <summary>
+    /// Changes a decision's players or options, then settles it. The host sends the commits that follow from the
+    /// change, such as a late player following an earlier pick; clients apply those instead of working them out.
+    /// </summary>
+    protected static IReadOnlyList<string> Settled<TAtom>(
+        LinkedChoice<TAtom> decision, IReadOnlyList<string>? replay, Func<TAtom, string> format, Func<string, TAtom> parse, Action change)
+        where TAtom : notnull
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        if (replay is not null)
+        {
+            change();
+            decision.ApplyAll(DecodeAll(replay, parse));
+            return replay;
+        }
+
+        var before = decision.Commits.Count;
+        change();
+        decision.Settle();
+        return CommitCodec.Encode(decision.Commits.Skip(before), format).ToList();
+    }
+
+    /// <summary>
+    /// A player's click: the host checks it and chooses, sending every commit that follows; a client records the same
+    /// vote and applies the host's commits.
+    /// </summary>
+    /// <param name="decision">The decision.</param>
+    /// <param name="op">The operation.</param>
+    /// <param name="choice">What the player clicked.</param>
+    /// <param name="replay">The host's result on a client, or null on the host.</param>
+    /// <param name="format">Writes an option for the notice.</param>
+    /// <param name="parse">Reads an option from the notice.</param>
+    /// <param name="check">A stricter check than the decision's own, like a reroll the player owes.</param>
+    protected static IReadOnlyList<string> ChooseOrApply<TAtom>(
+        LinkedChoice<TAtom> decision,
+        SyncOp op,
+        Selection<TAtom> choice,
+        IReadOnlyList<string>? replay,
+        Func<TAtom, string> format,
+        Func<string, TAtom> parse,
+        Func<CommitCheck>? check = null)
         where TAtom : notnull
     {
         if (replay is not null)
         {
-            decision.Apply(CommitCodec.Decode(op.Player, choice, replay));
+            decision.ApplyChoice(op.Player, choice, DecodeAll(replay, parse));
             return replay;
         }
 
-        var check = decision.CanCommit(op.Player, choice);
-        if (!check.IsAllowed)
+        var verdict = check?.Invoke() ?? decision.CanCommit(op.Player, choice);
+        if (!verdict.IsAllowed)
         {
-            throw new SyncRejectedException(check.ToString());
+            throw new SyncRejectedException(verdict.ToString());
         }
 
-        return CommitCodec.Encode(decision.Commit(op.Player, choice));
+        var before = decision.Commits.Count;
+        decision.Choose(op.Player, choice);
+        return CommitCodec.Encode(decision.Commits.Skip(before), format).ToList();
+    }
+
+    internal static string FormatKey(OptionKey key) => key.Value;
+
+    internal static OptionKey ParseKey(string text) =>
+        text.Length > 0 ? new OptionKey(text) : throw new SyncRejectedException("An option key is empty.");
+
+    internal static string FormatCard(CardId card) => SyncArgs.Number(card.Value);
+
+    internal static CardId ParseCard(string text) =>
+        long.TryParse(text, System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out var id)
+            ? new CardId(id)
+            : throw new SyncRejectedException("A card id isn't a number.");
+
+    private static List<Commit<TAtom>> DecodeAll<TAtom>(IReadOnlyList<string> replay, Func<string, TAtom> parse)
+        where TAtom : notnull
+    {
+        var reader = new ArgReader(replay);
+        var commits = CommitCodec.Decode(reader, parse);
+        reader.End();
+        return commits;
     }
 
     internal static IEnumerable<string> ScreenArgs(IEnumerable<ScreenCard> screen) =>
@@ -83,20 +144,15 @@ public abstract class SyncTable : ISyncTable
         var key = args.String();
         return key.Length > 0 ? key : throw new SyncRejectedException("An option key is empty.");
     }
-
-    private static CardId ParseCard(string text) =>
-        long.TryParse(text, System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out var id)
-            ? new CardId(id)
-            : throw new SyncRejectedException("A card id isn't a number.");
 }
 
 /// <summary>A decision matched by option key: events, Ancients, relic rewards, chests.</summary>
 public sealed class OptionTable : SyncTable
 {
-    public OptionTable(string id, LinkMode mode, int pickCount)
+    public OptionTable(string id, LinkMode mode, int pickCount, WhoDecides whoDecides = WhoDecides.EveryoneAgrees)
         : base(id)
     {
-        Decision = new OptionDecision(mode, pickCount);
+        Decision = new OptionDecision(mode, pickCount, whoDecides);
     }
 
     public OptionDecision Decision { get; }
@@ -120,17 +176,16 @@ public sealed class OptionTable : SyncTable
                     throw new SyncRejectedException("The pick count doesn't match.");
                 }
 
-                Decision.Join(op.Player, ReadOptions(args));
-                return [];
+                var joining = ReadOptions(args);
+                return Settled(Decision, replay, FormatKey, ParseKey, () => Decision.Join(op.Player, joining));
             case SyncActions.OptionsUpdate:
-                Decision.UpdateOptions(op.Player, ReadOptions(args));
-                return [];
-            case SyncActions.OptionsCommit:
-                return CommitOrApply(Decision, op, new Selection<OptionKey>(args.Rest().Select(key => new OptionKey(key))), replay);
+                var updated = ReadOptions(args);
+                return Settled(Decision, replay, FormatKey, ParseKey, () => Decision.UpdateOptions(op.Player, updated));
+            case SyncActions.OptionsChoose:
+                return ChooseOrApply(Decision, op, new Selection<OptionKey>(args.Rest().Select(ParseKey)), replay, FormatKey, ParseKey);
             case SyncActions.OptionsLeave:
                 args.End();
-                Decision.RemoveParticipant(op.Player);
-                return [];
+                return Settled(Decision, replay, FormatKey, ParseKey, () => Decision.RemoveParticipant(op.Player));
             default:
                 throw Unknown(op);
         }
@@ -151,10 +206,10 @@ public sealed class OptionTable : SyncTable
 /// <summary>A choice of cards from players' decks for the same action.</summary>
 public sealed class CardTable : SyncTable
 {
-    public CardTable(string id, ICardMatchingStrategy matching, LinkMode mode, int pickCount)
+    public CardTable(string id, ICardMatchingStrategy matching, LinkMode mode, int pickCount, WhoDecides whoDecides = WhoDecides.EveryoneAgrees)
         : base(id)
     {
-        Decision = new CardChoiceDecision(matching, mode, pickCount);
+        Decision = new CardChoiceDecision(matching, mode, pickCount, whoDecides);
     }
 
     public CardChoiceDecision Decision { get; }
@@ -174,14 +229,13 @@ public sealed class CardTable : SyncTable
                     throw new SyncRejectedException("The pick count doesn't match.");
                 }
 
-                Decision.Join(new SelectionScreen(op.Player, ReadScreen(args)));
-                return [];
-            case SyncActions.CardsCommit:
-                return CommitOrApply(Decision, op, ReadCards(args), replay);
+                var screen = new SelectionScreen(op.Player, ReadScreen(args));
+                return Settled(Decision, replay, FormatCard, ParseCard, () => Decision.Join(screen));
+            case SyncActions.CardsChoose:
+                return ChooseOrApply(Decision, op, ReadCards(args), replay, FormatCard, ParseCard);
             case SyncActions.CardsLeave:
                 args.End();
-                Decision.RemoveParticipant(op.Player);
-                return [];
+                return Settled(Decision, replay, FormatCard, ParseCard, () => Decision.RemoveParticipant(op.Player));
             default:
                 throw Unknown(op);
         }
@@ -191,10 +245,10 @@ public sealed class CardTable : SyncTable
 /// <summary>One card reward screen, with linked Driftwood rerolls.</summary>
 public sealed class RewardTable : SyncTable
 {
-    public RewardTable(string id, int number, LinkMode mode)
+    public RewardTable(string id, int number, LinkMode mode, WhoDecides whoDecides = WhoDecides.EveryoneAgrees)
         : base(id)
     {
-        Screen = new CardRewardScreen(number, mode);
+        Screen = new CardRewardScreen(number, mode, whoDecides);
     }
 
     public CardRewardScreen Screen { get; }
@@ -217,24 +271,16 @@ public sealed class RewardTable : SyncTable
                     throw new SyncRejectedException("The screen number doesn't match.");
                 }
 
-                Screen.Join(op.Player, ReadOffer(args));
-                return [];
-            case SyncActions.RewardCommit:
-                var option = new OptionKey(Key(args));
+                var offer = ReadOffer(args);
+                return Settled(Screen.Decision, replay, FormatKey, ParseKey, () => Screen.Join(op.Player, offer));
+            case SyncActions.RewardChoose:
+                var option = ParseKey(args.String());
                 args.End();
-                if (replay is not null)
-                {
-                    Screen.Decision.Apply(CommitCodec.Decode(op.Player, Selection.Of(option), replay));
-                    return replay;
-                }
-
-                var check = Screen.CanCommit(op.Player, option);
-                return check.IsAllowed
-                    ? CommitCodec.Encode(Screen.Commit(op.Player, option))
-                    : throw new SyncRejectedException(check.ToString());
+                return ChooseOrApply(
+                    Screen.Decision, op, Selection.Of(option), replay, FormatKey, ParseKey, () => Screen.CanCommit(op.Player, option));
             case SyncActions.RewardReroll:
-                Screen.Reroll(op.Player, ReadOffer(args));
-                return [];
+                var rerolled = ReadOffer(args);
+                return Settled(Screen.Decision, replay, FormatKey, ParseKey, () => Screen.Reroll(op.Player, rerolled));
             default:
                 throw Unknown(op);
         }
@@ -255,13 +301,16 @@ public sealed class RewardTable : SyncTable
     }
 }
 
-/// <summary>One shop visit by the party.</summary>
+/// <summary>
+/// One shop visit by the party. Purchases depend only on what's synced, so clients work them out the same way the
+/// host does; removal targets come from the host.
+/// </summary>
 public sealed class ShopTable : SyncTable
 {
-    public ShopTable(string id, LinkMode mode, ICardMatchingStrategy matching)
+    public ShopTable(string id, LinkMode mode, ICardMatchingStrategy matching, WhoDecides whoDecides = WhoDecides.EveryoneAgrees)
         : base(id)
     {
-        Shop = new ShopSession(mode, matching);
+        Shop = new ShopSession(mode, matching, whoDecides);
     }
 
     public ShopSession Shop { get; }
@@ -311,7 +360,7 @@ public sealed class ShopTable : SyncTable
                     throw new SyncRejectedException(check.ToString());
                 }
 
-                Shop.Buy(op.Player, slot);
+                Shop.Choose(op.Player, slot);
                 return [];
             case SyncActions.ShopGold:
                 var newGold = args.Int();
@@ -319,12 +368,13 @@ public sealed class ShopTable : SyncTable
                 args.End();
                 Shop.SetGold(op.Player, newGold);
                 Shop.SetFreePotionSlots(op.Player, newPotionSlots);
+                Shop.Settle();
                 return [];
             case SyncActions.ShopRemovalJoin:
-                Shop.RemovalTarget.Join(new SelectionScreen(op.Player, ReadScreen(args)));
-                return [];
-            case SyncActions.ShopRemovalCommit:
-                return CommitOrApply(Shop.RemovalTarget, op, ReadCards(args), replay);
+                var removalScreen = new SelectionScreen(op.Player, ReadScreen(args));
+                return Settled(Shop.RemovalTarget, replay, FormatCard, ParseCard, () => Shop.RemovalTarget.Join(removalScreen));
+            case SyncActions.ShopRemovalChoose:
+                return ChooseOrApply(Shop.RemovalTarget, op, ReadCards(args), replay, FormatCard, ParseCard);
             default:
                 throw Unknown(op);
         }
@@ -338,13 +388,15 @@ public sealed class ShopTable : SyncTable
     }
 }
 
-/// <summary>One campfire visit by the party.</summary>
+/// <summary>
+/// One campfire visit by the party. Every notice carries the host's category commits, then its Smith target commits.
+/// </summary>
 public sealed class CampfireTable : SyncTable
 {
-    public CampfireTable(string id, LinkMode mode, ICardMatchingStrategy matching)
+    public CampfireTable(string id, LinkMode mode, ICardMatchingStrategy matching, WhoDecides whoDecides = WhoDecides.EveryoneAgrees)
         : base(id)
     {
-        Campfire = new CampfireSession(mode, matching);
+        Campfire = new CampfireSession(mode, matching, whoDecides);
     }
 
     public CampfireSession Campfire { get; }
@@ -378,22 +430,76 @@ public sealed class CampfireTable : SyncTable
                 }
 
                 var screen = ReadScreen(args);
-                Campfire.Join(op.Player, options, hasTent, screen.Count > 0 ? new SelectionScreen(op.Player, screen) : null);
-                return [];
+                var upgradeScreen = screen.Count > 0 ? new SelectionScreen(op.Player, screen) : null;
+                if (replay is not null)
+                {
+                    Campfire.Join(op.Player, options, hasTent, upgradeScreen);
+                    var (joinCategories, joinTargets) = Decode(replay);
+                    Campfire.ApplySettle(joinCategories, joinTargets);
+                    return replay;
+                }
+
+                return Record(() =>
+                {
+                    Campfire.Join(op.Player, options, hasTent, upgradeScreen);
+                    Campfire.Settle();
+                });
             case SyncActions.CampfireChoose:
                 var optionId = Key(args);
                 args.End();
-                if (replay is null && Campfire.CanChoose(op.Player, optionId) is { IsAllowed: false } check)
+                if (replay is not null)
+                {
+                    var (categories, targets) = Decode(replay);
+                    Campfire.ApplyChoose(op.Player, optionId, categories, targets);
+                    return replay;
+                }
+
+                if (Campfire.CanChoose(op.Player, optionId) is { IsAllowed: false } check)
                 {
                     throw new SyncRejectedException(check.ToString());
                 }
 
-                Campfire.Choose(op.Player, optionId);
-                return [];
+                return Record(() => Campfire.Choose(op.Player, optionId));
             case SyncActions.CampfireSmith:
-                return CommitOrApply(Campfire.SmithTarget, op, ReadCards(args), replay);
+                var cards = ReadCards(args);
+                if (replay is not null)
+                {
+                    var (_, smithCommits) = Decode(replay);
+                    Campfire.SmithTarget.ApplyChoice(op.Player, cards, smithCommits);
+                    return replay;
+                }
+
+                var target = cards.Count == 1 ? cards.Items[0] : throw new SyncRejectedException(CommitCheck.WrongPickCount.ToString());
+                if (Campfire.CanChooseTarget(op.Player, target) is { IsAllowed: false } targetCheck)
+                {
+                    throw new SyncRejectedException(targetCheck.ToString());
+                }
+
+                return Record(() => Campfire.ChooseTarget(op.Player, target));
             default:
                 throw Unknown(op);
         }
+    }
+
+    /// <summary>On the host: makes a change and returns the category and Smith target commits it made.</summary>
+    private IReadOnlyList<string> Record(Action change)
+    {
+        var categoriesBefore = Campfire.Category.Commits.Count;
+        var targetsBefore = Campfire.SmithTarget.Commits.Count;
+        change();
+        return
+        [
+            .. CommitCodec.Encode(Campfire.Category.Commits.Skip(categoriesBefore), FormatKey),
+            .. CommitCodec.Encode(Campfire.SmithTarget.Commits.Skip(targetsBefore), FormatCard),
+        ];
+    }
+
+    private static (List<Commit<OptionKey>> Categories, List<Commit<CardId>> Targets) Decode(IReadOnlyList<string> replay)
+    {
+        var reader = new ArgReader(replay);
+        var categories = CommitCodec.Decode(reader, ParseKey);
+        var targets = CommitCodec.Decode(reader, ParseCard);
+        reader.End();
+        return (categories, targets);
     }
 }

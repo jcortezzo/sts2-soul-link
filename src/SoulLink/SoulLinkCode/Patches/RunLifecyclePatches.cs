@@ -15,6 +15,7 @@ internal static class RunLifecyclePatches
     private static void StartSession(INetGameService netService)
     {
         CardRewardLinks.Reset();
+        CardRewardExecutor.Reset();
         SoulLinkSession.Start(netService);
     }
 
@@ -24,5 +25,6 @@ internal static class RunLifecyclePatches
     {
         SoulLinkSession.Stop();
         CardRewardLinks.Reset();
+        CardRewardExecutor.Reset();
     }
 }

@@ -37,16 +37,16 @@ public sealed class SoulLinkRun
     public RunTracker Tracker { get; }
 
     /// <summary>A decision matched by option: events, Ancients, relic rewards, chests.</summary>
-    public OptionDecision NewOptionDecision(int pickCount = 1) => new(Settings.Mode, pickCount);
+    public OptionDecision NewOptionDecision(int pickCount = 1) => new(Settings.Mode, pickCount, Settings.WhoDecides);
 
     /// <summary>A choice of cards from players' decks for the same action.</summary>
-    public CardChoiceDecision NewCardChoice(int pickCount = 1) => new(Matching, Settings.Mode, pickCount);
+    public CardChoiceDecision NewCardChoice(int pickCount = 1) => new(Matching, Settings.Mode, pickCount, Settings.WhoDecides);
 
-    public CardRewardRound NewCardRewardRound() => new(Settings.Mode);
+    public CardRewardRound NewCardRewardRound() => new(Settings.Mode, Settings.WhoDecides);
 
-    public ShopSession NewShop() => new(Settings.Mode, Matching);
+    public ShopSession NewShop() => new(Settings.Mode, Matching, Settings.WhoDecides);
 
-    public CampfireSession NewCampfire() => new(Settings.Mode, Matching);
+    public CampfireSession NewCampfire() => new(Settings.Mode, Matching, Settings.WhoDecides);
 
     /// <summary>Pairs the starting decks at the start of the run.</summary>
     public void LinkStarterDecks(IReadOnlyList<StarterDeck> decks)

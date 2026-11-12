@@ -8,7 +8,8 @@ namespace SoulLink.Core.Tests.Shops;
 
 public class ShopSessionTests
 {
-    private static ShopSession NewShop(LinkMode mode) => new(mode, new DeckIndexMatching());
+    private static ShopSession NewShop(LinkMode mode, WhoDecides whoDecides = WhoDecides.FirstClick) =>
+        new(mode, new DeckIndexMatching(), whoDecides);
 
     private static ShopItem[] Stock(int card1 = 50, int relic2 = 150, int potion1 = 50, int removal = 75) =>
     [
@@ -136,5 +137,93 @@ public class ShopSessionTests
         shop.RemovalTarget.Commit(Ana, Card(Ana, 11));
 
         Assert.Equal(Selection.Of(Card(Ben, 10)), shop.RemovalTarget.StatusOf(Ben).Binding!.Required);
+    }
+
+    [Fact]
+    public void First_click_buys_the_slot_for_everyone_who_can()
+    {
+        var shop = NewShop(LinkMode.Nice);
+        shop.Enter(Ana, gold: 300, freePotionSlots: 2, Stock());
+        shop.Enter(Ben, gold: 200, freePotionSlots: 2, Stock());
+        shop.Enter(Cal, gold: 100, freePotionSlots: 2, Stock());
+
+        var purchases = shop.Choose(Ana, ShopSlot.Relic(2));
+
+        Assert.Equal([Ana, Ben], purchases.Select(purchase => purchase.Player));
+        Assert.Equal(purchases[0].Sequence, purchases[1].Root);
+        Assert.Empty(shop.OwedBy(Ben));
+        Assert.False(shop.HasBought(Cal, ShopSlot.Relic(2)));
+    }
+
+    [Fact]
+    public void Everyone_agrees_buys_a_slot_once_everyone_who_can_buy_it_votes()
+    {
+        var shop = NewShop(LinkMode.Nice, WhoDecides.EveryoneAgrees);
+        shop.Enter(Ana, gold: 300, freePotionSlots: 2, Stock());
+        shop.Enter(Ben, gold: 200, freePotionSlots: 2, Stock());
+        shop.Enter(Cal, gold: 100, freePotionSlots: 2, Stock());
+
+        Assert.Empty(shop.Choose(Ben, ShopSlot.Relic(2)));
+        Assert.Equal([ShopSlot.Relic(2)], shop.VotesOf(Ben));
+
+        // Cal can't afford it, so only Ana has to agree. Ben voted first, so his purchase leads.
+        var purchases = shop.Choose(Ana, ShopSlot.Relic(2));
+        Assert.Equal([Ben, Ana], purchases.Select(purchase => purchase.Player));
+        Assert.Equal(purchases[0].Sequence, purchases[1].Root);
+        Assert.Empty(shop.VotersFor(ShopSlot.Relic(2)));
+    }
+
+    [Fact]
+    public void Clicking_a_slot_again_takes_the_vote_back()
+    {
+        var shop = NewShop(LinkMode.Nice, WhoDecides.EveryoneAgrees);
+        shop.Enter(Ana, gold: 300, freePotionSlots: 2, Stock());
+        shop.Enter(Ben, gold: 300, freePotionSlots: 2, Stock());
+        shop.Choose(Ana, ShopSlot.Card(1));
+
+        shop.Choose(Ana, ShopSlot.Card(1));
+
+        Assert.Empty(shop.VotesOf(Ana));
+        Assert.Empty(shop.Choose(Ben, ShopSlot.Card(1)));
+    }
+
+    [Fact]
+    public void Votes_a_player_can_no_longer_pay_for_are_dropped()
+    {
+        var shop = NewShop(LinkMode.Nice, WhoDecides.EveryoneAgrees);
+        shop.Enter(Ana, gold: 100, freePotionSlots: 2, Stock(card1: 60, potion1: 50));
+        shop.Enter(Ben, gold: 300, freePotionSlots: 2, Stock());
+        shop.Choose(Ana, ShopSlot.Card(1));
+        shop.Choose(Ana, ShopSlot.Potion(1));
+
+        shop.Choose(Ben, ShopSlot.Card(1));
+
+        // Ana has 40 gold left, too little for her 50 gold potion.
+        Assert.True(shop.HasBought(Ana, ShopSlot.Card(1)));
+        Assert.Empty(shop.VotesOf(Ana));
+    }
+
+    [Fact]
+    public void A_player_who_can_no_longer_buy_stops_holding_up_the_others()
+    {
+        var shop = NewShop(LinkMode.Nice, WhoDecides.EveryoneAgrees);
+        shop.Enter(Ana, gold: 300, freePotionSlots: 2, Stock());
+        shop.Enter(Ben, gold: 300, freePotionSlots: 2, Stock());
+        shop.Choose(Ana, ShopSlot.Relic(2));
+
+        shop.SetGold(Ben, 100);
+
+        Assert.Equal([Ana], shop.Settle().Select(purchase => purchase.Player));
+    }
+
+    [Fact]
+    public void Mean_mode_refuses_votes_for_greyed_out_slots()
+    {
+        var shop = NewShop(LinkMode.Mean, WhoDecides.EveryoneAgrees);
+        shop.Enter(Ana, gold: 300, freePotionSlots: 2, Stock());
+        shop.Enter(Ben, gold: 100, freePotionSlots: 2, Stock());
+
+        Assert.Throws<InvalidOperationException>(() => shop.Choose(Ana, ShopSlot.Relic(2)));
+        Assert.Empty(shop.VotesOf(Ana));
     }
 }

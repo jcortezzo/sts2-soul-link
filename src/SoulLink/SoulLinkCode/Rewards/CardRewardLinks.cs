@@ -138,10 +138,26 @@ internal static class CardRewardLinks
         _ => CardRewardKeys.Skip,
     };
 
-    /// <summary>The operation that commits a key on the reward's screen, checked against the local linked state.</summary>
-    public static GatedOp Commit(string table, OptionKey key) =>
-        new(table, SyncActions.RewardCommit, [key.Value], state =>
+    /// <summary>The operation for a click on a key on the reward's screen, checked against the local linked state.</summary>
+    public static GatedOp Choose(string table, OptionKey key) =>
+        new(table, SyncActions.RewardChoose, [key.Value], state =>
             state.Find<RewardTable>(table)?.Screen.CanCommit(Me(), key));
+
+    /// <summary>The local player's linked screen for a table, once they've joined it.</summary>
+    public static CardRewardScreen? ScreenOf(string table) =>
+        SoulLinkSession.Current is { } session
+        && session.State.Find<RewardTable>(table)?.Screen is { } screen
+        && screen.Decision.IsParticipant(session.Me)
+            ? screen
+            : null;
+
+    /// <summary>A key as the player sees it: "card 2", "Skip" and so on.</summary>
+    public static string Describe(OptionKey key) =>
+        key.SlotNumber is { } slot ? $"card {slot}"
+        : key == CardRewardKeys.Skip ? "Skip"
+        : key == CardRewardKeys.Sacrifice ? "Sacrifice"
+        : key.IsExtra ? "their extra card"
+        : key.Value;
 
     /// <summary>Reports a reroll with the new offer.</summary>
     public static void ReportReroll(CardReward reward)

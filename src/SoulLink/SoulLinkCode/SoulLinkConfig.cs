@@ -19,5 +19,11 @@ internal sealed class SoulLinkConfig : SimpleModConfig
     /// <summary>Whether any player's death ends the run for everyone.</summary>
     public static bool SharedDeath { get; set; } = SoulLinkSettings.Default.SharedDeath;
 
-    public static SoulLinkSettings ToSettings() => new(CardMatching, Mode, SharedDeath);
+    /// <summary>
+    /// Everyone agrees: a choice waits until everyone who can make it has clicked it. First click: the first click
+    /// makes it for everyone.
+    /// </summary>
+    public static WhoDecides WhoDecides { get; set; } = SoulLinkSettings.Default.WhoDecides;
+
+    public static SoulLinkSettings ToSettings() => new(CardMatching, Mode, SharedDeath, WhoDecides);
 }

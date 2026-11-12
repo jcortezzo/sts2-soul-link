@@ -15,8 +15,9 @@ public sealed class CardChoiceDecision : LinkedChoice<CardId>
     /// <param name="matching">Linked cards or deck index, from the settings.</param>
     /// <param name="mode">Nice or mean, from the settings.</param>
     /// <param name="pickCount">How many cards each player picks.</param>
-    public CardChoiceDecision(ICardMatchingStrategy matching, LinkMode mode, int pickCount = 1)
-        : base(mode, pickCount)
+    /// <param name="whoDecides">Whether everyone has to agree, or the first click decides.</param>
+    public CardChoiceDecision(ICardMatchingStrategy matching, LinkMode mode, int pickCount = 1, WhoDecides whoDecides = WhoDecides.EveryoneAgrees)
+        : base(mode, pickCount, whoDecides)
     {
         ArgumentNullException.ThrowIfNull(matching);
         Matching = matching;
@@ -49,6 +50,8 @@ public sealed class CardChoiceDecision : LinkedChoice<CardId>
     public CommitCheck CanCommit(PlayerId player, CardId card) => CanCommit(player, Selection.Of(card));
 
     public Commit<CardId> Commit(PlayerId player, CardId card) => Commit(player, Selection.Of(card));
+
+    public IReadOnlyList<Commit<CardId>> Choose(PlayerId player, CardId card) => Choose(player, Selection.Of(card));
 
     protected override IEnumerable<CardId> Options(PlayerId player) => _screens[player].Cards.Select(card => card.Card);
 

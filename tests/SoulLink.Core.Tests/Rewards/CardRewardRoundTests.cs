@@ -135,4 +135,57 @@ public class CardRewardRoundTests
         Assert.Throws<ArgumentOutOfRangeException>(() => round.Screen(2));
         Assert.Throws<ArgumentOutOfRangeException>(() => round.Screen(0));
     }
+
+    [Fact]
+    public void Owing_a_reroll_takes_back_a_vote_and_holds_up_the_agreement()
+    {
+        var round = new CardRewardRound(LinkMode.Nice, WhoDecides.EveryoneAgrees);
+        round.Join(Ana, [ThreeWithDriftwood]);
+        round.Join(Ben, [ThreeWithDriftwood]);
+        round.Join(Cal, [Three]);
+        var screen = round.Screen(1);
+        screen.Choose(Ben, CardRewardKeys.Card(1));
+
+        Assert.Equal([Ben], screen.Reroll(Ana, ThreeWithDriftwood));
+
+        // Ben's cards are about to change, so his vote is gone and the others wait for him to reroll and vote again.
+        Assert.Null(screen.Decision.VoteOf(Ben));
+        screen.Choose(Ana, CardRewardKeys.Card(1));
+        Assert.Empty(screen.Choose(Cal, CardRewardKeys.Card(1)));
+        screen.Reroll(Ben, ThreeWithDriftwood);
+        Assert.Equal([Ana, Cal, Ben], screen.Choose(Ben, CardRewardKeys.Card(1)).Select(commit => commit.Player));
+    }
+
+    [Fact]
+    public void First_click_picks_for_a_player_who_owes_a_reroll_once_they_reroll()
+    {
+        var round = new CardRewardRound(LinkMode.Nice, WhoDecides.FirstClick);
+        round.Join(Ana, [ThreeWithDriftwood]);
+        round.Join(Ben, [ThreeWithDriftwood]);
+        round.Join(Cal, [Three]);
+        var screen = round.Screen(1);
+        screen.Reroll(Ana, ThreeWithDriftwood);
+
+        Assert.Equal([Cal, Ana], screen.Choose(Cal, CardRewardKeys.Card(2)).Select(commit => commit.Player));
+
+        screen.Reroll(Ben, ThreeWithDriftwood);
+        Assert.Equal([Ben], screen.Decision.Settle().Select(commit => commit.Player));
+    }
+
+    [Fact]
+    public void First_click_sacrifices_for_the_other_holders_but_leaves_them_a_choice_after_a_card_pick()
+    {
+        var round = new CardRewardRound(LinkMode.Nice, WhoDecides.FirstClick);
+        round.Join(Ana, [ThreeWithPaelsWing]);
+        round.Join(Ben, [ThreeWithPaelsWing]);
+        round.Join(Cal, [Three]);
+        var screen = round.Screen(1);
+
+        // Cal's card pick is made for no one with Pael's Wing, since they could sacrifice instead.
+        Assert.Equal([Cal], screen.Choose(Cal, CardRewardKeys.Card(3)).Select(commit => commit.Player));
+
+        // Ana's sacrifice is made for Ben, the other holder.
+        Assert.Equal([Ana, Ben], screen.Choose(Ana, CardRewardKeys.Sacrifice).Select(commit => commit.Player));
+        Assert.Equal(Selection.Of(CardRewardKeys.Sacrifice), screen.Decision.CommitOf(Ben)!.Choice);
+    }
 }

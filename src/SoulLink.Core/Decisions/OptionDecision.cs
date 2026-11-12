@@ -12,8 +12,9 @@ public sealed class OptionDecision : LinkedChoice<OptionKey>
 
     /// <param name="mode">Nice or mean, from the settings.</param>
     /// <param name="pickCount">How many options each player picks, like 2 for Room Full of Cheese.</param>
-    public OptionDecision(LinkMode mode, int pickCount = 1)
-        : base(mode, pickCount)
+    /// <param name="whoDecides">Whether everyone has to agree, or the first click decides.</param>
+    public OptionDecision(LinkMode mode, int pickCount = 1, WhoDecides whoDecides = WhoDecides.EveryoneAgrees)
+        : base(mode, pickCount, whoDecides)
     {
     }
 
@@ -48,6 +49,8 @@ public sealed class OptionDecision : LinkedChoice<OptionKey>
     public CommitCheck CanCommit(PlayerId player, OptionKey option) => CanCommit(player, Selection.Of(option));
 
     public Commit<OptionKey> Commit(PlayerId player, OptionKey option) => Commit(player, Selection.Of(option));
+
+    public IReadOnlyList<Commit<OptionKey>> Choose(PlayerId player, OptionKey option) => Choose(player, Selection.Of(option));
 
     protected override IEnumerable<OptionKey> Options(PlayerId player) => _options[player].Select(option => option.Key);
 

@@ -4,7 +4,7 @@ using SoulLink.Core.Sync;
 
 namespace SoulLink.SoulLinkCode.Ui;
 
-/// <summary>One operation a click needs the host to accept before the game acts on it.</summary>
+/// <summary>One operation a click sends to the host.</summary>
 /// <param name="Table">The table id.</param>
 /// <param name="Action">The action, from <see cref="SyncActions"/>.</param>
 /// <param name="Args">The action's arguments.</param>
@@ -18,19 +18,21 @@ internal sealed record GatedOp(
     Action? Sent = null);
 
 /// <summary>
-/// Holds a player's click on a linked option until the host accepts it, then replays the click. The game's own sync
-/// carries the actual choice, so the mod never changes game state itself.
+/// Sends a player's click on a linked option to the host instead of letting the game act on it. With everyone agrees
+/// the click is a vote, and with first click it decides. Whatever the host then commits for the local player is done
+/// in the game as an approved click, by the same code whoever's click caused it, so the game's own sync still
+/// carries the actual choice.
 /// </summary>
 internal static class ClickGate
 {
-    /// <summary>How long to wait for the host before accepting clicks again, in case an answer never arrives.</summary>
+    /// <summary>How long to ignore further clicks while waiting for the host, in case an answer never arrives.</summary>
     private const ulong WaitLimitMsec = 5000;
 
     private static object? _approved;
     private static bool _waiting;
     private static ulong _waitingSince;
 
-    /// <summary>True when a click is replaying after the host accepted it, so the patch should let it through.</summary>
+    /// <summary>True when the mod itself is doing this click, so the patch should let it through.</summary>
     public static bool TryConsumeApproval(object owner)
     {
         if (!ReferenceEquals(_approved, owner))
@@ -42,12 +44,27 @@ internal static class ClickGate
         return true;
     }
 
+    /// <summary>Does a click the mod approved, letting it through the gate patches.</summary>
+    public static void RunApproved(GodotObject owner, Action click)
+    {
+        _approved = owner;
+        try
+        {
+            click();
+        }
+        finally
+        {
+            _approved = null;
+        }
+    }
+
     /// <summary>
-    /// Decides whether a click may go ahead. Returns true when the game should act now: outside linked runs, or when
-    /// the host accepted at once (on the host). Otherwise the click is blocked or waits for the host, and
-    /// <paramref name="replay"/> runs once every operation is accepted.
+    /// Decides whether the game may act on a click now. Returns true outside linked runs or when there's nothing to
+    /// send. Otherwise the game's own action is skipped and the operations go to the host, unless the local copy of
+    /// the linked state already refuses them; <paramref name="answered"/> then runs with whether everything was
+    /// accepted.
     /// </summary>
-    public static bool Request(GodotObject owner, IReadOnlyList<GatedOp> ops, Action replay)
+    public static bool Request(IReadOnlyList<GatedOp> ops, Action<bool>? answered = null)
     {
         var session = SoulLinkSession.Current;
         if (session?.Run is null || ops.Count == 0)
@@ -66,13 +83,13 @@ internal static class ClickGate
             {
                 MainFile.Logger.Info($"Soul Link blocked {op.Action} on {op.Table}: {check}");
                 LockView.Refresh();
+                answered?.Invoke(false);
                 return false;
             }
         }
 
         var remaining = ops.Count;
         var failed = false;
-        var synchronous = true;
         _waiting = true;
         _waitingSince = Time.GetTicksMsec();
         foreach (var op in ops)
@@ -81,48 +98,17 @@ internal static class ClickGate
             session.Submit(op.Table, op.Action, op.Args, accepted =>
             {
                 failed |= !accepted;
-                if (--remaining > 0 || synchronous)
+                if (--remaining > 0)
                 {
                     return;
                 }
 
                 _waiting = false;
-                Finish(owner, failed, replay);
+                LockView.Refresh();
+                answered?.Invoke(!failed);
             });
         }
 
-        synchronous = false;
-        if (remaining > 0)
-        {
-            return false;
-        }
-
-        // Every operation was answered during Submit, which only happens on the host.
-        _waiting = false;
-        if (failed)
-        {
-            LockView.Refresh();
-        }
-
-        return !failed;
-    }
-
-    private static void Finish(GodotObject owner, bool failed, Action replay)
-    {
-        if (failed || !GodotObject.IsInstanceValid(owner))
-        {
-            LockView.Refresh();
-            return;
-        }
-
-        _approved = owner;
-        try
-        {
-            replay();
-        }
-        finally
-        {
-            _approved = null;
-        }
+        return false;
     }
 }
