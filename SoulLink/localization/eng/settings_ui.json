@@ -1,9 +1,9 @@
 {
   "SOULLINK-RULES.title": "Rules",
-  "SOULLINK-CARD_MATCHING.title": "Card Matching",
-  "SOULLINK-CARD_MATCHING.hover.desc": "Which of your cards counts as the same card for upgrades, removals and other deck choices: the card at the same position, or the card linked to theirs. The host's setting applies to everyone.",
-  "SOULLINK-CARD_MATCHING.LinkedCards": "Linked Cards",
-  "SOULLINK-CARD_MATCHING.DeckIndex": "Deck Index",
+  "SOULLINK-DECK_CARD_MATCHING.title": "Card Matching",
+  "SOULLINK-DECK_CARD_MATCHING.hover.desc": "Which of your cards counts as the same card for upgrades, removals and other deck choices: the card at the same position, or the card linked to theirs. The host's setting applies to everyone.",
+  "SOULLINK-DECK_CARD_MATCHING.LinkedCards": "Linked Cards",
+  "SOULLINK-DECK_CARD_MATCHING.DeckIndex": "Deck Index",
   "SOULLINK-MODE.title": "Mode",
   "SOULLINK-MODE.hover.desc": "Nice: whoever can make the same choice has to. Mean: an option is greyed out unless everyone can take it. The host's setting applies to everyone.",
   "SOULLINK-MODE.Nice": "Nice",

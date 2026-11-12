@@ -10,9 +10,13 @@ namespace SoulLink.SoulLinkCode;
 [ConfigHoverTipsByDefault]
 internal sealed class SoulLinkConfig : SimpleModConfig
 {
-    /// <summary>Which of your cards counts as "the same card" for upgrades, removals and other deck choices.</summary>
+    /// <summary>
+    /// Which of your cards counts as "the same card" for upgrades, removals and other deck choices. Saved under a new
+    /// name since deck index became the default: the old setting's saved value was linked cards for everyone who ran
+    /// an earlier version, and BaseLib's saved values win over defaults, so it would never have switched over.
+    /// </summary>
     [ConfigSection("Rules")]
-    public static CardMatching CardMatching { get; set; } = SoulLinkSettings.Default.CardMatching;
+    public static CardMatching DeckCardMatching { get; set; } = SoulLinkSettings.Default.CardMatching;
 
     /// <summary>Nice: whoever can follow a choice must. Mean: options are greyed out unless everyone can take them.</summary>
     public static LinkMode Mode { get; set; } = SoulLinkSettings.Default.Mode;
@@ -26,5 +30,5 @@ internal sealed class SoulLinkConfig : SimpleModConfig
     /// </summary>
     public static WhoDecides WhoDecides { get; set; } = SoulLinkSettings.Default.WhoDecides;
 
-    public static SoulLinkSettings ToSettings() => new(CardMatching, Mode, SharedDeath, WhoDecides);
+    public static SoulLinkSettings ToSettings() => new(DeckCardMatching, Mode, SharedDeath, WhoDecides);
 }
