@@ -42,6 +42,11 @@ Every peer runs the same rules engine. Players send their clicks to the host, wh
 arrive and broadcasts numbered notices that everyone replays, so the host decides who clicked first. A notice carries
 every pick that followed from the click, for any player, and each player's game then makes their own pick on screen.
 
+A player joins a linked screen when it opens, and every click on it carries the join again until that player's game
+has seen the host accept it, so one lost message can't leave a player out of a decision; the host ignores a join it
+already has. The log flags a request the host hasn't answered in ten seconds and an update from the host that's
+missing, since every later update waits for it.
+
 ## Build
 
 ```powershell

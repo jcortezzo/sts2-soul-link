@@ -15,6 +15,9 @@ internal sealed class SoulLinkSession
 {
     private const int MaxEarlyMessages = 256;
 
+    /// <summary>How long a request may wait for the host's answer before it's logged as unanswered.</summary>
+    private const ulong UnansweredMsec = 10000;
+
     /// <summary>Messages that arrived before this peer's session started, applied once it does.</summary>
     private static readonly Queue<Action<SoulLinkSession>> EarlyMessages = new();
 
@@ -22,6 +25,7 @@ internal sealed class SoulLinkSession
     private readonly SyncHost? _host;
     private readonly SyncReplica? _replica;
     private readonly List<PendingOp> _pending = [];
+    private long? _reportedGap;
 
     private SoulLinkSession(INetGameService net, bool isHost)
     {
@@ -63,6 +67,13 @@ internal sealed class SoulLinkSession
 
     /// <summary>The run with the host's settings, once the host's start notice has arrived.</summary>
     public SoulLinkRun? Run => State.Run;
+
+    /// <summary>
+    /// Whether this peer's copy of the linked state has the local player in the table the join is for. Until it does,
+    /// a click on that table sends the join again with it, so a join that got lost can't leave the player out.
+    /// </summary>
+    public bool HasJoined(string table, string action, IReadOnlyList<string> args) =>
+        State.IsJoined(new SyncOp(table, Me, action, args));
 
     /// <summary>A player's name as the platform shows it, for the indicators.</summary>
     public string NameOf(PlayerId player)
@@ -128,7 +139,8 @@ internal sealed class SoulLinkSession
         var op = new SyncOp(table, Me, action, args);
         if (_host is null)
         {
-            _pending.Add(new PendingOp(op, done));
+            ReportUnanswered();
+            _pending.Add(new PendingOp(op, done, Godot.Time.GetTicksMsec()));
             CustomMessageWrapper.Send(new SoulLinkRequestMessage { Op = op }, _net);
             return;
         }
@@ -199,6 +211,51 @@ internal sealed class SoulLinkSession
         {
             MainFile.Logger.Error($"Soul Link drifted from the host: {_replica.Errors[i]}");
         }
+
+        ReportGap();
+    }
+
+    /// <summary>
+    /// Logs when an update from the host goes missing, because every later update waits for it and nothing linked
+    /// changes on this peer until it arrives, and logs again once it does.
+    /// </summary>
+    private void ReportGap()
+    {
+        if (_replica is null)
+        {
+            return;
+        }
+
+        var missing = _replica.Missing;
+        if (missing == _reportedGap)
+        {
+            return;
+        }
+
+        if (missing is { } sequence)
+        {
+            MainFile.Logger.Warn($"Soul Link is missing update {sequence} from the host; {_replica.HeldBack} later update(s) wait for it.");
+        }
+        else
+        {
+            MainFile.Logger.Info($"Soul Link got the missing update {_reportedGap} from the host and caught up.");
+        }
+
+        _reportedGap = missing;
+    }
+
+    /// <summary>
+    /// Logs requests the host hasn't answered for a while. An answer always comes back, accepted or refused, so a
+    /// request still waiting means it or its answer got lost on the way.
+    /// </summary>
+    private void ReportUnanswered()
+    {
+        var now = Godot.Time.GetTicksMsec();
+        foreach (var pending in _pending.Where(pending => !pending.Reported && now - pending.SentAtMsec > UnansweredMsec))
+        {
+            pending.Reported = true;
+            MainFile.Logger.Warn($"Soul Link has had no answer from the host for {(now - pending.SentAtMsec) / 1000}s: {pending.Op}");
+        }
     }
 
     private void OnRejection(SyncRejection rejection)
@@ -241,5 +298,15 @@ internal sealed class SoulLinkSession
         return done;
     }
 
-    private sealed record PendingOp(SyncOp Op, Action<bool>? Done);
+    private sealed class PendingOp(SyncOp op, Action<bool>? done, ulong sentAtMsec)
+    {
+        public SyncOp Op { get; } = op;
+
+        public Action<bool>? Done { get; } = done;
+
+        public ulong SentAtMsec { get; } = sentAtMsec;
+
+        /// <summary>Whether the missing answer was logged already.</summary>
+        public bool Reported { get; set; }
+    }
 }

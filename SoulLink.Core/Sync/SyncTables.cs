@@ -17,6 +17,12 @@ public interface ISyncTable
 
     /// <summary>On a client: applies an operation the host accepted, with the host's result.</summary>
     void Replay(SyncOp op, IReadOnlyList<string> result);
+
+    /// <summary>
+    /// Whether the operation is the player joining this table when they're in it already. Such a join changes nothing
+    /// and is accepted, so a player can send their join again with a click whenever they haven't seen it arrive.
+    /// </summary>
+    bool IsRepeatJoin(SyncOp op);
 }
 
 /// <summary>Shared handling for tables, so the host and clients run the same code.</summary>
@@ -30,9 +36,17 @@ public abstract class SyncTable : ISyncTable
 
     public string Id { get; }
 
-    public IReadOnlyList<string> Execute(SyncOp op) => Handle(op, replay: null);
+    public IReadOnlyList<string> Execute(SyncOp op) => IsRepeatJoin(op) ? [] : Handle(op, replay: null);
 
-    public void Replay(SyncOp op, IReadOnlyList<string> result) => Handle(op, result);
+    public void Replay(SyncOp op, IReadOnlyList<string> result)
+    {
+        if (!IsRepeatJoin(op))
+        {
+            Handle(op, result);
+        }
+    }
+
+    public virtual bool IsRepeatJoin(SyncOp op) => false;
 
     /// <summary>Applies an operation.</summary>
     /// <param name="op">The operation.</param>
@@ -157,6 +171,8 @@ public sealed class OptionTable : SyncTable
 
     public OptionDecision Decision { get; }
 
+    public override bool IsRepeatJoin(SyncOp op) => op.Action == SyncActions.OptionsJoin && Decision.IsParticipant(op.Player);
+
     /// <summary>Arguments for <see cref="SyncActions.OptionsJoin"/>.</summary>
     public static IReadOnlyList<string> JoinArgs(int pickCount, IEnumerable<DecisionOption> options) =>
         [SyncArgs.Number(pickCount), .. OptionArgs(options)];
@@ -214,6 +230,8 @@ public sealed class CardTable : SyncTable
 
     public CardChoiceDecision Decision { get; }
 
+    public override bool IsRepeatJoin(SyncOp op) => op.Action == SyncActions.CardsJoin && Decision.IsParticipant(op.Player);
+
     /// <summary>Arguments for <see cref="SyncActions.CardsJoin"/>: pick count, then the screen in order.</summary>
     public static IReadOnlyList<string> JoinArgs(int pickCount, IEnumerable<ScreenCard> screen) =>
         [SyncArgs.Number(pickCount), .. ScreenArgs(screen)];
@@ -252,6 +270,8 @@ public sealed class RewardTable : SyncTable
     }
 
     public CardRewardScreen Screen { get; }
+
+    public override bool IsRepeatJoin(SyncOp op) => op.Action == SyncActions.RewardJoin && Screen.Decision.IsParticipant(op.Player);
 
     /// <summary>Arguments for <see cref="SyncActions.RewardJoin"/>: the screen number, then the offer.</summary>
     public static IReadOnlyList<string> JoinArgs(int number, CardRewardOffer offer) => [SyncArgs.Number(number), .. OfferArgs(offer)];
@@ -314,6 +334,10 @@ public sealed class ShopTable : SyncTable
     }
 
     public ShopSession Shop { get; }
+
+    public override bool IsRepeatJoin(SyncOp op) =>
+        (op.Action == SyncActions.ShopEnter && Shop.IsIn(op.Player))
+        || (op.Action == SyncActions.ShopRemovalJoin && Shop.RemovalTarget.IsParticipant(op.Player));
 
     /// <summary>Arguments for <see cref="SyncActions.ShopEnter"/>.</summary>
     public static IReadOnlyList<string> EnterArgs(int gold, int freePotionSlots, IEnumerable<ShopItem> items) =>
@@ -400,6 +424,8 @@ public sealed class CampfireTable : SyncTable
     }
 
     public CampfireSession Campfire { get; }
+
+    public override bool IsRepeatJoin(SyncOp op) => op.Action == SyncActions.CampfireJoin && Campfire.IsAt(op.Player);
 
     /// <summary>Arguments for <see cref="SyncActions.CampfireJoin"/>.</summary>
     public static IReadOnlyList<string> JoinArgs(bool hasMiniatureTent, IReadOnlyCollection<CampfireOption> options, IEnumerable<ScreenCard>? upgradeScreen) =>

@@ -391,4 +391,101 @@ public class SyncTests
         Assert.Equal(["slot:1=CARD|ANGER|0"], peeks);
         Assert.Empty(network.Host.State.PeeksOf("f2/rewards-1/card-2"));
     }
+
+    [Fact]
+    public void A_repeat_join_is_accepted_and_changes_nothing_on_any_peer()
+    {
+        var network = new SyncTestNetwork(FirstClick with { CardMatching = CardMatching.DeckIndex });
+        const string screen = "f3/event/1|slot:1/cards-1";
+        var join = CardTable.JoinArgs(1, Screen(Ben, 5).Cards);
+        network.Send(screen, Ana, SyncActions.CardsJoin, CardTable.JoinArgs(1, Screen(Ana, 5).Cards));
+        Assert.True(network.Send(screen, Ben, SyncActions.CardsJoin, join).IsAccepted);
+
+        var again = network.Send(screen, Ben, SyncActions.CardsJoin, join);
+
+        Assert.True(again.IsAccepted);
+        Assert.Empty(again.Notice!.Result);
+        Assert.Equal(2, network.Agreed(state => state.Find<CardTable>(screen)!.Decision.Participants.Count));
+        Assert.All(network.States, state => Assert.True(state.IsJoined(new SyncOp(screen, Ben, SyncActions.CardsJoin, join))));
+    }
+
+    [Fact]
+    public void Every_kind_of_join_can_be_sent_again()
+    {
+        var network = new SyncTestNetwork(FirstClick with { CardMatching = CardMatching.DeckIndex });
+        ShopItem[] stock = [new(ShopSlot.CardRemoval, 75)];
+        CampfireOption[] options = [new(CampfireOptions.Rest), new(CampfireOptions.Smith)];
+        (string Table, string Action, IReadOnlyList<string> Args)[] joins =
+        [
+            (Event, SyncActions.OptionsJoin, EventJoin),
+            ("f4/rewards-1/card-1", SyncActions.RewardJoin, RewardTable.JoinArgs(1, new CardRewardOffer(3))),
+            ("f7/shop", SyncActions.ShopEnter, ShopTable.EnterArgs(300, 2, stock)),
+            ("f9/campfire", SyncActions.CampfireJoin, CampfireTable.JoinArgs(false, options, Screen(Ben, 10).Cards)),
+        ];
+
+        foreach (var (table, action, args) in joins)
+        {
+            Assert.True(network.Send(table, Ben, action, args).IsAccepted);
+            Assert.True(network.Send(table, Ben, action, args).IsAccepted);
+        }
+
+        network.Send("f7/shop", Ben, SyncActions.ShopBuy, ShopTable.SlotArgs(ShopSlot.CardRemoval));
+        var removal = ShopTable.RemovalScreenArgs(Screen(Ben, 10).Cards);
+        Assert.True(network.Send("f7/shop", Ben, SyncActions.ShopRemovalJoin, removal).IsAccepted);
+        Assert.True(network.Send("f7/shop", Ben, SyncActions.ShopRemovalJoin, removal).IsAccepted);
+        network.Agreed(state => state.Find<OptionTable>(Event)!.Decision.Participants.Count);
+    }
+
+    [Fact]
+    public void A_lost_join_is_repaired_by_the_pick_that_carries_it_with_first_click()
+    {
+        var network = new SyncTestNetwork(FirstClick with { CardMatching = CardMatching.DeckIndex });
+        const string screen = "f3/event/1|slot:1/cards-1";
+        network.Send(screen, Ana, SyncActions.CardsJoin, CardTable.JoinArgs(1, Screen(Ana, 5).Cards));
+
+        // Ben's join never arrives, so Ana's pick decides for her alone.
+        network.Send(screen, Ana, SyncActions.CardsChoose, SyncArgs.Number(Card(Ana, 3).Value));
+        Assert.False(network.Replicas[Ben].State.IsJoined(new SyncOp(screen, Ben, SyncActions.CardsJoin, CardTable.JoinArgs(1, Screen(Ben, 5).Cards))));
+
+        // His pick carries the join again: joining late, he follows Ana's pick, so his own pick is refused as decided.
+        Assert.True(network.Send(screen, Ben, SyncActions.CardsJoin, CardTable.JoinArgs(1, Screen(Ben, 5).Cards)).IsAccepted);
+        Assert.False(network.Send(screen, Ben, SyncActions.CardsChoose, SyncArgs.Number(Card(Ben, 1).Value)).IsAccepted);
+
+        Assert.Equal(Selection.Of(Card(Ben, 3)), network.Agreed(state => state.Find<CardTable>(screen)!.Decision.CommitOf(Ben)?.Choice));
+    }
+
+    [Fact]
+    public void A_lost_join_is_repaired_by_the_pick_that_carries_it_with_everyone_agrees()
+    {
+        var network = new SyncTestNetwork(SoulLinkSettings.Default with { CardMatching = CardMatching.DeckIndex });
+        const string screen = "f3/event/1|slot:1/cards-1";
+        network.Send(screen, Ana, SyncActions.CardsJoin, CardTable.JoinArgs(1, Screen(Ana, 5).Cards));
+        network.Send(screen, Ana, SyncActions.CardsChoose, SyncArgs.Number(Card(Ana, 3).Value));
+
+        // Joining late, Ben is held to the card matching Ana's: another pick is refused, and that one is taken.
+        network.Send(screen, Ben, SyncActions.CardsJoin, CardTable.JoinArgs(1, Screen(Ben, 5).Cards));
+        Assert.False(network.Send(screen, Ben, SyncActions.CardsChoose, SyncArgs.Number(Card(Ben, 1).Value)).IsAccepted);
+        Assert.True(network.Send(screen, Ben, SyncActions.CardsChoose, SyncArgs.Number(Card(Ben, 3).Value)).IsAccepted);
+
+        Assert.Equal(Selection.Of(Card(Ben, 3)), network.Agreed(state => state.Find<CardTable>(screen)!.Decision.CommitOf(Ben)?.Choice));
+    }
+
+    [Fact]
+    public void A_client_reports_the_update_it_is_missing()
+    {
+        var host = new SyncHost(Ana);
+        var replica = new SyncReplica();
+        var start = host.Submit(new SyncOp("run", Ana, SyncActions.RunStart, SyncState.StartArgs(FirstClick)), Ana).Notice!;
+        var join = host.Submit(new SyncOp(Event, Ana, SyncActions.OptionsJoin, EventJoin), Ana).Notice!;
+        var choose = host.Submit(new SyncOp(Event, Ana, SyncActions.OptionsChoose, [Slot(1).Value]), Ana).Notice!;
+
+        replica.Receive(start);
+        replica.Receive(choose);
+        Assert.Equal(join.Sequence, replica.Missing);
+        Assert.Equal(1, replica.HeldBack);
+
+        replica.Receive(join);
+        Assert.Null(replica.Missing);
+        Assert.Equal(choose.Sequence, replica.Applied);
+    }
 }

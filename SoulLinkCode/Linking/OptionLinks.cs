@@ -40,15 +40,20 @@ internal static class OptionLinks
 
     public static PlayerId IdOf(Player player) => new(player.NetId);
 
-    /// <summary>Joins a table once, with the local player's options in display order.</summary>
-    public static IReadOnlyList<GatedOp> JoinOps(string table, IReadOnlyList<DecisionOption> options, int pickCount = 1)
+    /// <summary>
+    /// The join for a table, with the local player's options in display order. A screen joins once when it opens; a
+    /// click (<paramref name="again"/>) sends the join again until this peer has seen the host accept it, so a join
+    /// that got lost on the way can't leave the player out of the decision. The host ignores a join it already has.
+    /// </summary>
+    public static IReadOnlyList<GatedOp> JoinOps(string table, IReadOnlyList<DecisionOption> options, int pickCount = 1, bool again = false)
     {
-        if (Joined.Contains(table))
+        var args = OptionTable.JoinArgs(pickCount, options);
+        if ((!again && Joined.Contains(table)) || Session is not { } session || session.HasJoined(table, SyncActions.OptionsJoin, args))
         {
             return [];
         }
 
-        return [new GatedOp(table, SyncActions.OptionsJoin, OptionTable.JoinArgs(pickCount, options), Sent: () => Joined.Add(table))];
+        return [new GatedOp(table, SyncActions.OptionsJoin, args, Sent: () => Joined.Add(table))];
     }
 
     /// <summary>Sends operations that need no answer, like joining a table when its screen opens.</summary>

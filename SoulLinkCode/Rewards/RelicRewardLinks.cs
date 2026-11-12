@@ -45,11 +45,12 @@ internal static class RelicRewardLinks
         return null;
     }
 
-    public static IReadOnlyList<GatedOp> JoinOps(RelicReward reward) =>
-        !reward.SuccessfullySelected && TableId(reward) is { } table ? OptionLinks.JoinOps(table, Options) : [];
+    /// <summary>The reward's join: once when the screen opens, and again with a click until the host's acceptance arrives.</summary>
+    public static IReadOnlyList<GatedOp> JoinOps(RelicReward reward, bool again = false) =>
+        !reward.SuccessfullySelected && TableId(reward) is { } table ? OptionLinks.JoinOps(table, Options, again: again) : [];
 
     /// <summary>Joins every relic reward in the set when the rewards screen opens.</summary>
-    public static void JoinAll(RewardsSet set) => OptionLinks.Submit(set.Rewards.OfType<RelicReward>().SelectMany(JoinOps).ToList());
+    public static void JoinAll(RewardsSet set) => OptionLinks.Submit(set.Rewards.OfType<RelicReward>().SelectMany(reward => JoinOps(reward)).ToList());
 
     /// <summary>
     /// Lets a click go straight to the game when taking the relic is the local player's committed choice, so the game
@@ -88,7 +89,7 @@ internal static class RelicRewardLinks
                 continue;
             }
 
-            foreach (var op in JoinOps(reward))
+            foreach (var op in JoinOps(reward, again: true))
             {
                 yield return op;
             }

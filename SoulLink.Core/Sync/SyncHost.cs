@@ -84,6 +84,15 @@ public sealed class SyncReplica
     /// <summary>Notices that failed to apply, which means this client drifted from the host.</summary>
     public IReadOnlyList<string> Errors => _errors;
 
+    /// <summary>
+    /// The notice this client is missing while later ones wait for it, or null when nothing is held back. Every
+    /// update from the host after a missing one waits, so a notice that never arrives stalls the whole linked state.
+    /// </summary>
+    public long? Missing => _early.Count > 0 ? Applied + 1 : null;
+
+    /// <summary>How many notices are held back waiting for <see cref="Missing"/>.</summary>
+    public int HeldBack => _early.Count;
+
     /// <summary>Applies a notice, or holds it until the notices before it arrive. Duplicates are ignored.</summary>
     public void Receive(SyncNotice notice)
     {

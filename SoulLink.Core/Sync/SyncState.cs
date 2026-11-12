@@ -65,6 +65,16 @@ public sealed class SyncState
         _tables.GetValueOrDefault(id) as TTable;
 
     /// <summary>
+    /// Whether this copy of the state already has the player in the table the join is for, so sending the join again
+    /// would change nothing. On a client that means the host accepted the join and its notice arrived.
+    /// </summary>
+    public bool IsJoined(SyncOp join)
+    {
+        ArgumentNullException.ThrowIfNull(join);
+        return _tables.TryGetValue(join.Table, out var table) && table.IsRepeatJoin(join);
+    }
+
+    /// <summary>
     /// Forgets a table, for example when the party leaves the room. Later operations on it are refused on the host
     /// and skipped on clients. Every peer can close tables on their own.
     /// </summary>

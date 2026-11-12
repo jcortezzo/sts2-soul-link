@@ -123,7 +123,7 @@ internal static class CardRewardGatePatches
 
         var key = CardRewardLinks.KeyOfCard(options, index);
         return CardRewardExecutor.TakeCommittedClick(__instance, table, key)
-            || ClickGate.Request(CardRewardLinks.JoinOps(reward).Append(CardRewardLinks.Choose(table, key)).ToList());
+            || ClickGate.Request(CardRewardLinks.JoinOps(reward, again: true).Append(CardRewardLinks.Choose(table, key)).ToList());
     }
 
     [HarmonyPatch(typeof(NCardRewardSelectionScreen), "OnAlternateRewardSelected")]
@@ -152,7 +152,7 @@ internal static class CardRewardGatePatches
         }
 
         return CardRewardExecutor.TakeCommittedClick(__instance, table, key)
-            || ClickGate.Request(CardRewardLinks.JoinOps(reward).Append(CardRewardLinks.Choose(table, key)).ToList());
+            || ClickGate.Request(CardRewardLinks.JoinOps(reward, again: true).Append(CardRewardLinks.Choose(table, key)).ToList());
     }
 
     /// <summary>
@@ -206,7 +206,7 @@ internal static class CardRewardGatePatches
                 continue;
             }
 
-            ops.AddRange(CardRewardLinks.JoinOps(reward));
+            ops.AddRange(CardRewardLinks.JoinOps(reward, again: true));
             ops.Add(CardRewardLinks.Choose(table, CardRewardKeys.Skip));
         }
 
@@ -263,7 +263,7 @@ internal static class CardRewardGatePatches
 
         // Clicking a relic means the player isn't leaving yet.
         CardRewardExecutor.CancelProceed();
-        ClickGate.Request([.. RelicRewardLinks.JoinOps(reward), OptionLinks.Choose(table, OptionKey.Take)]);
+        ClickGate.Request([.. RelicRewardLinks.JoinOps(reward, again: true), OptionLinks.Choose(table, OptionKey.Take)]);
         return false;
     }
 

@@ -133,9 +133,12 @@ internal static class EventLinks
     public static bool IsAvailable(EventModel ev, EventOption option) =>
         !option.IsLocked && !(ev.Owner is { } owner && option.WillKillPlayer?.Invoke(owner) == true);
 
-    /// <summary>Joins the local player's current page once, with what it offers.</summary>
-    public static IReadOnlyList<GatedOp> JoinOps(EventModel ev) =>
-        IsLinked(ev) && TableId(ev) is { } table ? OptionLinks.JoinOps(table, OptionsOf(ev)) : [];
+    /// <summary>
+    /// The join for the local player's current page, with what it offers: once when the page opens, and again with a
+    /// click (<paramref name="again"/>) until the host's acceptance arrives.
+    /// </summary>
+    public static IReadOnlyList<GatedOp> JoinOps(EventModel ev, bool again = false) =>
+        IsLinked(ev) && TableId(ev) is { } table ? OptionLinks.JoinOps(table, OptionsOf(ev), again: again) : [];
 
     /// <summary>Joins the local player's current page, if it's linked, so mean mode knows their options before anyone picks.</summary>
     public static void JoinCurrent()

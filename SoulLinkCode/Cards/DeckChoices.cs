@@ -104,12 +104,15 @@ internal static class DeckChoices
         var number = ScreensPerContext[context.Key] = ScreensPerContext.GetValueOrDefault(context.Key) + 1;
         var table = $"{context.Key}/cards-{number}";
         var pickCount = Math.Max(1, PrefsOf(screen)?.MaxSelect ?? 1);
-        _open = new OpenScreen(screen, table, fromDeck, pickCount, cards, context.SameChoice);
+        var join = new GatedOp(
+            table,
+            fromDeck ? SyncActions.CardsJoin : SyncActions.OptionsJoin,
+            fromDeck
+                ? CardTable.JoinArgs(pickCount, ids.Select(id => new ScreenCard(id!.Value)))
+                : OptionTable.JoinArgs(pickCount, Enumerable.Range(1, cards.Count).Select(slot => new DecisionOption(OptionKey.Slot(slot)))));
+        _open = new OpenScreen(screen, table, fromDeck, pickCount, cards, context.SameChoice, join);
         MainFile.Logger.Info($"Soul Link linked the card screen {table}: {cards.Count} {(fromDeck ? "deck" : "offered")} card(s), pick {pickCount}.");
-        var args = fromDeck
-            ? CardTable.JoinArgs(pickCount, ids.Select(id => new ScreenCard(id!.Value)))
-            : OptionTable.JoinArgs(pickCount, Enumerable.Range(1, cards.Count).Select(slot => new DecisionOption(OptionKey.Slot(slot))));
-        session.Submit(table, fromDeck ? SyncActions.CardsJoin : SyncActions.OptionsJoin, args, accepted =>
+        session.Submit(table, join.Action, join.Args, accepted =>
             MainFile.Logger.Info($"Soul Link's card screen {table} {(accepted ? "joined" : "was refused by")} the host."));
         if (!fromDeck)
         {
@@ -141,8 +144,9 @@ internal static class DeckChoices
             return;
         }
 
-        // Confirming the pick that's already the player's vote, or on its way, keeps it rather than taking it back.
-        if (SameCards(open.Sent, picked) || SameCards(open.Sending, picked) || SameCards(open.Held?.Cards, picked))
+        // Confirming the pick that's already the player's vote, or on its way, keeps it rather than taking it back. A pick
+        // whose answer never came is sent again once the click gate stops waiting for that answer.
+        if (SameCards(open.Sent, picked) || (SameCards(open.Sending, picked) && ClickGate.IsBusy) || SameCards(open.Held?.Cards, picked))
         {
             return;
         }
@@ -339,21 +343,31 @@ internal static class DeckChoices
             return;
         }
 
+        if (awaited.Count > 0)
+        {
+            MainFile.Logger.Warn($"Soul Link stopped waiting for {string.Join(", ", awaited.Select(session.NameOf))}'s card screen on {open.Table}; they follow the pick when it opens.");
+        }
+
         _open = open with { Held = null, Sending = held.Cards };
-        MainFile.Logger.Info($"Soul Link sent a pick of {held.Cards.Count} card(s) on {open.Table}.");
+
+        // The pick carries the screen's join until this peer has seen the host accept it, so a join that got lost on
+        // the way can't leave the player out of the linked choice. The host ignores a join it already has.
+        var joining = !session.HasJoined(open.Join.Table, open.Join.Action, open.Join.Args);
+        MainFile.Logger.Info($"Soul Link sent a pick of {held.Cards.Count} card(s) on {open.Table}{(joining ? " with the screen's join" : "")}.");
         var op = open.FromDeck
             ? new GatedOp(open.Table, SyncActions.CardsChoose, held.Cards.Select(card => SyncArgs.Number(CardIds.IdOf(card)!.Value.Value)).ToList(), state =>
                 state.Find<CardTable>(open.Table)?.Decision is { } cards && cards.IsParticipant(session.Me)
                     ? cards.CanCommit(session.Me, new Selection<CardId>(held.Cards.Select(card => CardIds.IdOf(card)!.Value)))
                     : null)
             : OptionLinks.Choose(open.Table, held.Cards.Select(card => OptionKey.Slot(IndexOf(open.Cards, card) + 1)).ToArray());
-        ClickGate.Request([op], accepted => Answered(open.Screen, held.Cards, accepted));
+        ClickGate.Request(joining ? [open.Join, op] : [op], accepted => Answered(open.Screen, held.Cards, accepted));
     }
 
     /// <summary>The host's answer to a pick. A refused pick can be made again.</summary>
     private static void Answered(NCardGridSelectionScreen screen, IReadOnlyList<CardModel> pick, bool accepted)
     {
-        if (_open is not { } open || !ReferenceEquals(open.Screen, screen))
+        // An answer for a pick that was sent again, or replaced by another, says nothing about the pick on its way now.
+        if (_open is not { } open || !ReferenceEquals(open.Screen, screen) || !SameCards(open.Sending, pick))
         {
             return;
         }
@@ -428,6 +442,7 @@ internal static class DeckChoices
     private sealed record HeldPick(IReadOnlyList<CardModel> Cards, ulong Since);
 
     /// <summary>The local player's linked card screen.</summary>
+    /// <param name="Join">The screen's join, sent when it opens and with picks until the host's acceptance arrives.</param>
     /// <param name="Held">A confirmed pick waiting for teammates' screens.</param>
     /// <param name="HoldStarted">When the player first confirmed a pick, in engine ticks.</param>
     /// <param name="Sending">A pick on its way to the host.</param>
@@ -439,6 +454,7 @@ internal static class DeckChoices
         int PickCount,
         IReadOnlyList<CardModel> Cards,
         Func<IReadOnlyList<PlayerId>> SameChoice,
+        GatedOp Join,
         HeldPick? Held = null,
         ulong? HoldStarted = null,
         IReadOnlyList<CardModel>? Sending = null,

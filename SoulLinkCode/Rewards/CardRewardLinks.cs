@@ -105,16 +105,22 @@ internal static class CardRewardLinks
     public static string? SetPrefix(RewardsSet set) =>
         ReferenceEquals(set, CurrentSet) && SetNumbers.TryGetValue(set, out var number) ? $"{LocationOf(set)}/rewards-{number.Value}" : null;
 
-    /// <summary>Joins the reward's linked screen once, with what it offers.</summary>
-    public static IReadOnlyList<GatedOp> JoinOps(CardReward reward)
+    /// <summary>
+    /// The join for the reward's linked screen, with what it offers: once when the screen opens, and again with a
+    /// click (<paramref name="again"/>) until this peer has seen the host accept it. The host ignores a repeat.
+    /// </summary>
+    public static IReadOnlyList<GatedOp> JoinOps(CardReward reward, bool again = false)
     {
-        if (TableId(reward) is not { } table || Joined.Contains(table) || CurrentSet is not { } set)
+        if (TableId(reward) is not { } table || (!again && Joined.Contains(table)) || CurrentSet is not { } set
+            || SoulLinkSession.Current is not { } session)
         {
             return [];
         }
 
         var args = RewardTable.JoinArgs(ScreenNumber(set, reward), OfferOf(reward));
-        return [new GatedOp(table, SyncActions.RewardJoin, args, Sent: () => Joined.Add(table))];
+        return session.HasJoined(table, SyncActions.RewardJoin, args)
+            ? []
+            : [new GatedOp(table, SyncActions.RewardJoin, args, Sent: () => Joined.Add(table))];
     }
 
     /// <summary>The option key of the card at an index of the reward's options: a slot, or an extra from a relic.</summary>

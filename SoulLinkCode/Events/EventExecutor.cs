@@ -99,7 +99,7 @@ internal static class EventExecutor
         }
 
         _held = null;
-        ClickGate.Request([.. EventLinks.JoinOps(ev), EventLinks.Choose(table, key)]);
+        ClickGate.Request([.. EventLinks.JoinOps(ev, again: true), EventLinks.Choose(table, key)]);
     }
 
     /// <summary>Checks for clicks to send and options to take after the linked state or the event changed. Once per frame at most.</summary>
@@ -182,7 +182,7 @@ internal static class EventExecutor
                 }
 
                 _held = null;
-                ClickGate.Request([.. EventLinks.JoinOps(ev), EventLinks.Choose(table, held.Key)]);
+                ClickGate.Request([.. EventLinks.JoinOps(ev, again: true), EventLinks.Choose(table, held.Key)]);
             }
         }
 

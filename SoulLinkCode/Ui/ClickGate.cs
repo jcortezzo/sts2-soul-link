@@ -37,6 +37,7 @@ internal static class ClickGate
     private static object? _approved;
     private static bool _waiting;
     private static ulong _waitingSince;
+    private static int _request;
 
     /// <summary>
     /// True in the first moments of a co-op run, before the host's settings arrive: linked clicks are ignored then,
@@ -108,6 +109,7 @@ internal static class ClickGate
 
         var remaining = ops.Count;
         var failed = false;
+        var request = ++_request;
         _waiting = true;
         _waitingSince = Time.GetTicksMsec();
         foreach (var op in ops)
@@ -121,7 +123,12 @@ internal static class ClickGate
                     return;
                 }
 
-                _waiting = false;
+                // A late answer to an earlier click that stopped being waited for mustn't free the gate for a newer one.
+                if (request == _request)
+                {
+                    _waiting = false;
+                }
+
                 Views.RefreshAll();
                 answered?.Invoke(!failed);
             });

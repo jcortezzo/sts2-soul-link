@@ -49,15 +49,21 @@ internal static class ChestLinks
         Synchronizer?.CurrentRelics is { Count: > 0 } && OptionLinks.Room is { } room ? $"{room}/chest" : null;
 
     /// <summary>Joins the chest's table once its relics are shown: one slot per relic, plus skipping.</summary>
-    public static void JoinCurrent()
+    public static void JoinCurrent() => OptionLinks.Submit(JoinOps());
+
+    /// <summary>
+    /// The chest's join: once when its relics are shown, and again with a click (<paramref name="again"/>) until the
+    /// host's acceptance arrives.
+    /// </summary>
+    private static IReadOnlyList<GatedOp> JoinOps(bool again = false)
     {
         if (OptionLinks.Session is null || TableId() is not { } table || Synchronizer?.CurrentRelics is not { } relics)
         {
-            return;
+            return [];
         }
 
         var options = Enumerable.Range(1, relics.Count).Select(slot => new DecisionOption(OptionKey.Slot(slot))).Append(new DecisionOption(OptionKey.Skip));
-        OptionLinks.Submit(OptionLinks.JoinOps(table, options.ToList()));
+        return OptionLinks.JoinOps(table, options.ToList(), again: again);
     }
 
     /// <summary>
@@ -74,8 +80,7 @@ internal static class ChestLinks
 
         if (OptionLinks.CommitOf(table) is null)
         {
-            JoinCurrent();
-            ClickGate.Request([OptionLinks.Choose(table, OptionKey.Slot(index + 1))]);
+            ClickGate.Request([.. JoinOps(again: true), OptionLinks.Choose(table, OptionKey.Slot(index + 1))]);
         }
 
         return false;
@@ -98,8 +103,7 @@ internal static class ChestLinks
             return commit.Choice.Contains(OptionKey.Skip);
         }
 
-        JoinCurrent();
-        ClickGate.Request([OptionLinks.Choose(table, OptionKey.Skip)]);
+        ClickGate.Request([.. JoinOps(again: true), OptionLinks.Choose(table, OptionKey.Skip)]);
         return false;
     }
 

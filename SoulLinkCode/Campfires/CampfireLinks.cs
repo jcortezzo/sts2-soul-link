@@ -51,18 +51,25 @@ internal static class CampfireLinks
             : null;
 
     /// <summary>Arrives at the campfire once its options are shown, with the local player's options and Miniature Tent.</summary>
-    public static void JoinCurrent()
+    public static void JoinCurrent() => OptionLinks.Submit(JoinOps());
+
+    /// <summary>
+    /// The campfire's join: once when its options are shown, and again with a click (<paramref name="again"/>) until
+    /// this peer has seen the host accept it. The host ignores a repeat.
+    /// </summary>
+    private static IReadOnlyList<GatedOp> JoinOps(bool again = false)
     {
-        if (OptionLinks.Session is not { } session || Room() is not { } room || TableId() is not { } table || Joined.Contains(table)
+        if (OptionLinks.Session is not { } session || Room() is not { } room || TableId() is not { } table || (!again && Joined.Contains(table))
             || room.Options is not { Count: > 0 } options)
         {
-            return;
+            return [];
         }
 
         var hasTent = OptionLinks.Me?.Relics.OfType<MiniatureTent>().Any() == true;
         var args = CampfireTable.JoinArgs(hasTent, options.Select(option => new CampfireOption(option.OptionId, option.IsEnabled)).ToList(), null);
-        Joined.Add(table);
-        session.Submit(table, SyncActions.CampfireJoin, args);
+        return session.HasJoined(table, SyncActions.CampfireJoin, args)
+            ? []
+            : [new GatedOp(table, SyncActions.CampfireJoin, args, Sent: () => Joined.Add(table))];
     }
 
     /// <summary>
@@ -77,7 +84,6 @@ internal static class CampfireLinks
             return true;
         }
 
-        JoinCurrent();
         if (Campfire(table) is { } campfire && campfire.ChosenBy(session.Me).Contains(option.OptionId, StringComparer.OrdinalIgnoreCase))
         {
             Done.Add($"{table}|{option.OptionId}");
@@ -87,6 +93,7 @@ internal static class CampfireLinks
 
         ClickGate.Request(
         [
+            .. JoinOps(again: true),
             new GatedOp(table, SyncActions.CampfireChoose, [option.OptionId], state =>
                 state.Find<CampfireTable>(table)?.Campfire is { } linked && linked.IsAt(session.Me) ? linked.CanChoose(session.Me, option.OptionId) : null),
         ]);

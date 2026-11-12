@@ -159,18 +159,33 @@ internal static class ShopLinks
     }
 
     /// <summary>Enters the shop once the local player's stock is ready, with their gold and free potion slots.</summary>
-    public static void EnterCurrent()
+    public static void EnterCurrent() => OptionLinks.Submit(EnterOps());
+
+    /// <summary>
+    /// The shop's join: once when the stock is ready, and again with a click (<paramref name="again"/>) until this
+    /// peer has seen the host accept it. The host ignores a repeat.
+    /// </summary>
+    private static IReadOnlyList<GatedOp> EnterOps(bool again = false)
     {
-        if (OptionLinks.Session is not { } session || TableId() is not { } table || Entered.Contains(table)
+        if (OptionLinks.Session is not { } session || TableId() is not { } table || (!again && Entered.Contains(table))
             || Inventory() is not { } inventory || OptionLinks.Me is not { } me)
         {
-            return;
+            return [];
         }
 
         var items = Slots(inventory).Select(slot => new ShopItem(slot.Slot, slot.Entry.Cost, slot.Entry.IsStocked)).ToList();
-        Entered.Add(table);
-        _lastReported = (me.Gold, FreePotionSlots(me));
-        session.Submit(table, SyncActions.ShopEnter, ShopTable.EnterArgs(me.Gold, FreePotionSlots(me), items));
+        var args = ShopTable.EnterArgs(me.Gold, FreePotionSlots(me), items);
+        if (session.HasJoined(table, SyncActions.ShopEnter, args))
+        {
+            return [];
+        }
+
+        var reported = (me.Gold, FreePotionSlots(me));
+        return [new GatedOp(table, SyncActions.ShopEnter, args, Sent: () =>
+        {
+            Entered.Add(table);
+            _lastReported = reported;
+        })];
     }
 
     /// <summary>
@@ -186,7 +201,6 @@ internal static class ShopLinks
             return true;
         }
 
-        EnterCurrent();
         if (Shop(table) is { } shop)
         {
             if (Undone(shop, table, session.Me).FirstOrDefault(purchase => purchase.Slot == slot) is { } owed)
@@ -206,6 +220,7 @@ internal static class ShopLinks
 
         ClickGate.Request(
         [
+            .. EnterOps(again: true),
             new GatedOp(table, SyncActions.ShopBuy, ShopTable.SlotArgs(slot), state =>
                 state.Find<ShopTable>(table)?.Shop is { } linked && linked.IsIn(session.Me) ? ToCommitCheck(linked.CanBuy(session.Me, slot)) : null),
         ]);
