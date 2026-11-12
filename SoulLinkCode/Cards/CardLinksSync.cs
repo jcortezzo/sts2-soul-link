@@ -74,6 +74,20 @@ internal static class CardLinksSync
         }
     }
 
+    /// <summary>
+    /// Called when the game swaps a card joining a deck for a modified copy, as Frozen Egg, Molten Egg, Toxic Egg and
+    /// Fresnel Lens do: if the card is a transform's replacement, the copy is what joins the deck, so the copy takes
+    /// over the original's place in its link group.
+    /// </summary>
+    public static void Modified(CardModel card, CardModel result)
+    {
+        if (!ReferenceEquals(card, result) && Replacing.TryGetValue(card, out var original))
+        {
+            Replacing.Remove(card);
+            Replacing.AddOrUpdate(result, original);
+        }
+    }
+
     /// <summary>Strike and Defend pair across characters; every other starting card pairs by what it is.</summary>
     private static string PairingName(CardModel card) =>
         card.Tags.Contains(CardTag.Strike) ? "Strike"

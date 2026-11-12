@@ -3,6 +3,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
@@ -33,6 +34,11 @@ internal static class CardIdPatches
         var original = __instance.Original;
         Guard(() => CardLinksSync.Transforming(original, __result));
     }
+
+    /// <summary>Relics like Frozen Egg add an upgraded copy of a card to the deck instead of the card itself.</summary>
+    [HarmonyPatch(typeof(Hook), nameof(Hook.ModifyCardBeingAddedToDeck))]
+    [HarmonyPostfix]
+    private static void ModifiedForDeck(CardModel card, CardModel __result) => Guard(() => CardLinksSync.Modified(card, __result));
 
     /// <summary>Deck bookkeeping must never break the game's own card handling.</summary>
     private static void Guard(Action action)
