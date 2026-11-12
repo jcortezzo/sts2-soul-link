@@ -3,6 +3,7 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes.Rooms;
 using SoulLink.Core;
 using SoulLink.Core.Decisions;
+using SoulLink.SoulLinkCode.Cards;
 using SoulLink.SoulLinkCode.Ui;
 
 namespace SoulLink.SoulLinkCode.Events;
@@ -60,7 +61,22 @@ internal static class EventExecutor
         }
 
         Done.Add(table);
+        MarkSource(table, commit);
         return true;
+    }
+
+    /// <summary>
+    /// Marks the option the local player takes as the source of what follows from it: cards it gives link with the
+    /// cards the others got from it, and a card screen it opens links with theirs.
+    /// </summary>
+    private static void MarkSource(string table, Commit<OptionKey> commit)
+    {
+        var key = commit.Choice.Items[0];
+        CardLinksSync.GainingFrom(table, key.Value, commit.Root);
+        DeckChoices.Acting(table, key.Value, () =>
+            EventLinks.DecisionOf(table) is { } decision
+                ? decision.Participants.Where(player => decision.CommitOf(player)?.Choice.Contains(key) == true).ToList()
+                : []);
     }
 
     /// <summary>Handles the local player's click on an option of a linked page. The game never acts on it directly.</summary>
@@ -186,6 +202,7 @@ internal static class EventExecutor
 
         var option = ev.CurrentOptions[index];
         MainFile.Logger.Info($"Soul Link chose {commit.Choice} on {table}.");
+        MarkSource(table, commit);
         ClickGate.RunApproved(room, () => room.OptionButtonClicked(option, index));
     }
 }

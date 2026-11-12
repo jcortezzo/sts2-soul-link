@@ -9,6 +9,7 @@ using SoulLink.Core;
 using SoulLink.Core.Campfires;
 using SoulLink.Core.Decisions;
 using SoulLink.Core.Sync;
+using SoulLink.SoulLinkCode.Cards;
 using SoulLink.SoulLinkCode.Linking;
 using SoulLink.SoulLinkCode.Ui;
 
@@ -82,6 +83,7 @@ internal static class CampfireLinks
         if (Campfire(table) is { } campfire && campfire.ChosenBy(session.Me).Contains(option.OptionId, StringComparer.OrdinalIgnoreCase))
         {
             Done.Add($"{table}|{option.OptionId}");
+            MarkSource(table, option.OptionId);
             return true;
         }
 
@@ -138,6 +140,13 @@ internal static class CampfireLinks
             room,
             campfire.Campers.Count > 1 ? StatusLine.Join(session, campfire.Campers, (player, isMe) => Doing(campfire, player, isMe)) : "");
     }
+
+    /// <summary>Marks the option as the source of a card screen it opens, like Smith's, so the screens of everyone who chose it link.</summary>
+    private static void MarkSource(string table, string optionId) =>
+        DeckChoices.Acting(table, optionId.ToUpperInvariant(), () =>
+            Campfire(table) is { } campfire
+                ? campfire.Campers.Where(player => campfire.ChosenBy(player).Contains(optionId, StringComparer.OrdinalIgnoreCase)).ToList()
+                : []);
 
     private static bool Picked(CampfireSession campfire, PlayerId player, string optionId) =>
         string.Equals(campfire.PendingOf(player), optionId, StringComparison.OrdinalIgnoreCase)
@@ -200,6 +209,7 @@ internal static class CampfireLinks
 
             Done.Add(key);
             MainFile.Logger.Info($"Soul Link chose {optionId} at the campfire.");
+            MarkSource(table, optionId);
             ClickGate.RunApproved(button, () => SelectOptionMethod.Invoke(button, [option]));
             return;
         }

@@ -67,6 +67,18 @@ public static class SyncActions
     /// <summary>Host only: starts the run with the host's settings. Args: card matching, mode, shared death, who decides.</summary>
     public const string RunStart = "run.start";
 
+    /// <summary>
+    /// Host only: pairs the starting decks into link groups. Args: player count, then for each player their id, card
+    /// count, and card id and pairing name pairs in deck order.
+    /// </summary>
+    public const string LinksStarters = "links.starters";
+
+    /// <summary>
+    /// Reports cards the player gained from a linked choice, so they link with the cards other players gained from
+    /// it. Args: the source key (see <see cref="Cards.GainLinks.SourceKey"/>), then the card ids.
+    /// </summary>
+    public const string LinksGained = "links.gained";
+
     /// <summary>Joins an option decision. Args: pick count, then key and availability pairs.</summary>
     public const string OptionsJoin = "options.join";
 

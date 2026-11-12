@@ -1,3 +1,5 @@
+using SoulLink.Core.Cards;
+
 namespace SoulLink.Core.Sync;
 
 /// <summary>
@@ -17,6 +19,29 @@ public sealed class SyncState
     public SoulLinkRun? Run { get; private set; }
 
     public IReadOnlyCollection<string> TableIds => _tables.Keys;
+
+    /// <summary>Arguments for <see cref="SyncActions.LinksStarters"/>.</summary>
+    public static IReadOnlyList<string> StarterArgs(IReadOnlyList<StarterDeck> decks)
+    {
+        ArgumentNullException.ThrowIfNull(decks);
+        var args = new List<string> { SyncArgs.Number(decks.Count) };
+        foreach (var deck in decks)
+        {
+            args.Add(SyncArgs.Player(deck.Player));
+            args.Add(SyncArgs.Number(deck.Cards.Count));
+            foreach (var card in deck.Cards)
+            {
+                args.Add(SyncArgs.Number(card.Card.Value));
+                args.Add(card.Name);
+            }
+        }
+
+        return args;
+    }
+
+    /// <summary>Arguments for <see cref="SyncActions.LinksGained"/>.</summary>
+    public static IReadOnlyList<string> GainedArgs(string source, IEnumerable<CardId> cards) =>
+        [source, .. cards.Select(card => SyncArgs.Number(card.Value))];
 
     /// <summary>Arguments for <see cref="SyncActions.RunStart"/>.</summary>
     public static IReadOnlyList<string> StartArgs(SoulLinkSettings settings)
@@ -69,6 +94,18 @@ public sealed class SyncState
             throw new SyncRejectedException("The run hasn't started.");
         }
 
+        switch (op.Action)
+        {
+            case SyncActions.LinksStarters:
+                Run.LinkStarterDecks(ReadDecks(new ArgReader(op.Args)));
+                return [];
+            case SyncActions.LinksGained:
+                var gained = new ArgReader(op.Args);
+                var source = gained.String();
+                Run.Gains.Gain(source, op.Player, gained.Rest().Select(SyncTable.ParseCard).ToList());
+                return [];
+        }
+
         if (_closed.Contains(op.Table))
         {
             // The host refuses new operations on a closed table, but a client that closed it first skips the
@@ -117,6 +154,27 @@ public sealed class SyncState
     {
         var number = new ArgReader(op.Args).Int();
         return number >= 1 ? number : throw new SyncRejectedException("The first argument must be at least 1.");
+    }
+
+    private static List<StarterDeck> ReadDecks(ArgReader args)
+    {
+        var decks = new List<StarterDeck>();
+        var players = args.Count();
+        for (var i = 0; i < players; i++)
+        {
+            var player = args.Player();
+            var count = args.Count();
+            var cards = new List<StarterCard>(count);
+            for (var j = 0; j < count; j++)
+            {
+                cards.Add(new StarterCard(new CardId(args.Long()), args.String()));
+            }
+
+            decks.Add(new StarterDeck(player, cards));
+        }
+
+        args.End();
+        return decks;
     }
 
     private void Start(SyncOp op)

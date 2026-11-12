@@ -1,4 +1,5 @@
 using SoulLink.SoulLinkCode.Campfires;
+using SoulLink.SoulLinkCode.Cards;
 using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Rewards;
@@ -17,6 +18,7 @@ internal static class Views
         Refresh("chest", ChestLinks.Refresh);
         Refresh("campfire", CampfireLinks.Refresh);
         Refresh("shop", ShopLinks.Refresh);
+        Refresh("card choice", DeckChoices.Refresh);
     }
 
     /// <summary>

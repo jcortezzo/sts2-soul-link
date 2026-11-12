@@ -5,6 +5,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Rewards;
 using SoulLink.Core.Decisions;
 using SoulLink.Core.Rewards;
+using SoulLink.SoulLinkCode.Cards;
 using SoulLink.SoulLinkCode.Ui;
 
 namespace SoulLink.SoulLinkCode.Rewards;
@@ -127,7 +128,17 @@ internal static class CardRewardExecutor
         }
 
         Done.Add(table);
+        MarkSource(table);
         return true;
+    }
+
+    /// <summary>Marks the card the local player takes from a linked card reward as gained from it, for linked cards.</summary>
+    private static void MarkSource(string table)
+    {
+        if (SoulLinkSession.Current is { } session && CardRewardLinks.ScreenOf(table)?.Decision.CommitOf(session.Me) is { } commit)
+        {
+            CardLinksSync.GainingFrom(table, commit.Choice.Items[0].Value, commit.Root);
+        }
     }
 
     /// <summary>Checks for picks to do after the linked state or the screens changed. Runs once per frame at most.</summary>
@@ -205,6 +216,7 @@ internal static class CardRewardExecutor
                     _opening = null;
                 }
 
+                MarkSource(table);
                 if (TryClick(screen, key))
                 {
                     Done.Add(table);

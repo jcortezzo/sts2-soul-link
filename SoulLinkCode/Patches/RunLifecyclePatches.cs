@@ -2,6 +2,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Runs;
 using SoulLink.SoulLinkCode.Campfires;
+using SoulLink.SoulLinkCode.Cards;
 using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Linking;
@@ -21,6 +22,7 @@ internal static class RunLifecyclePatches
     {
         ResetScreens();
         SoulLinkSession.Start(netService);
+        CardLinksSync.StartRun(OptionLinks.RunState);
     }
 
     [HarmonyPatch(nameof(RunManager.CleanUp))]
@@ -43,5 +45,6 @@ internal static class RunLifecyclePatches
         ChestLinks.Reset();
         CampfireLinks.Reset();
         ShopLinks.Reset();
+        DeckChoices.Reset();
     }
 }

@@ -89,4 +89,17 @@ public class LinkRegistryTests
         Assert.Equal(second, restored.GroupOf(Ref(Ben, 2)));
         Assert.Equal(new LinkGroupId(3), restored.Link([Ref(Ana, 3), Ref(Ben, 3)]));
     }
+
+    [Fact]
+    public void A_card_can_join_an_existing_group_once_per_player()
+    {
+        var links = new LinkRegistry();
+        var group = links.Link([Ref(Ana, 1), Ref(Ben, 1)])!.Value;
+
+        Assert.True(links.Add(group, Ref(Cal, 1)));
+        Assert.False(links.Add(group, Ref(Cal, 2)));
+        Assert.False(links.Add(new LinkGroupId(99), Ref(Dee, 1)));
+        Assert.Throws<ArgumentException>(() => links.Add(group, Ref(Ana, 1)));
+        Assert.Equal(group, links.GroupOf(Ref(Cal, 1)));
+    }
 }

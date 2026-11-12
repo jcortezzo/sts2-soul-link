@@ -4,6 +4,7 @@ using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Modding;
 using SoulLink.SoulLinkCode.Campfires;
+using SoulLink.SoulLinkCode.Cards;
 using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Rewards;
@@ -22,12 +23,14 @@ public partial class MainFile : Node
     public static void Initialize()
     {
         ModConfigRegistry.Register(ModId, new SoulLinkConfig());
+        CardLinksSync.Initialize();
         SoulLinkSession.StateChanged += Views.RefreshAll;
         SoulLinkSession.StateChanged += CardRewardExecutor.Schedule;
         SoulLinkSession.StateChanged += EventExecutor.Schedule;
         SoulLinkSession.StateChanged += ChestLinks.Schedule;
         SoulLinkSession.StateChanged += CampfireLinks.Schedule;
         SoulLinkSession.StateChanged += ShopLinks.Schedule;
+        SoulLinkSession.StateChanged += DeckChoices.Schedule;
 
         Harmony harmony = new(ModId);
         harmony.PatchAll(Assembly.GetExecutingAssembly());

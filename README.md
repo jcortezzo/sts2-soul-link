@@ -4,10 +4,9 @@ A co-op mod for Slay the Spire 2 that links every out-of-combat decision between
 
 It's inspired by Pokémon Soul Link challenges and the [Slay the Soul-Link](https://docs.google.com/document/d/1XyDEOh4QqVfNqKOosRGrHEikjtB77w95TzjEURAe4lY/edit?tab=t.0) challenge by Rayditz and naturesbf.
 
-> **Status:** early development. The rules engine and the host-ordered sync are done and tested. In game, card
-> rewards, relic rewards, chests, campfires, shops, events and Ancients (Neow included) are linked so far; deck card
-> choices (Smith targets, removals, transforms and the rest) are next. Not on the Steam Workshop yet, and the name is a
-> working title.
+> **Status:** early development, ready for co-op playtesting. Every decision in the rules is linked in game: card
+> rewards, deck card choices, shops, campfires, events, Ancients (Neow included), relic rewards and chests. Links between
+> cards aren't saved with the run yet. Not on the Steam Workshop yet, and the name is a working title.
 
 ## Rules
 

@@ -28,7 +28,9 @@ public sealed class SyncHost
 
     /// <summary>Checks and applies an operation a player sent.</summary>
     /// <param name="op">The operation.</param>
-    /// <param name="sender">Who sent it. Players can only act for themselves, and only the host can start the run.</param>
+    /// <param name="sender">
+    /// Who sent it. Players can only act for themselves, and only the host can start the run or pair the starting decks.
+    /// </param>
     public SyncOutcome Submit(SyncOp op, PlayerId sender)
     {
         ArgumentNullException.ThrowIfNull(op);
@@ -37,9 +39,9 @@ public sealed class SyncHost
             return Reject(op, "Players can only act for themselves.");
         }
 
-        if (op.Action == SyncActions.RunStart && sender != Host)
+        if (op.Action is SyncActions.RunStart or SyncActions.LinksStarters && sender != Host)
         {
-            return Reject(op, "Only the host can start the run.");
+            return Reject(op, "Only the host can start the run or pair the starting decks.");
         }
 
         IReadOnlyList<string> result;

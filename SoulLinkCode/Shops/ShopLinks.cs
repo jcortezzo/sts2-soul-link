@@ -7,6 +7,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens.Shops;
 using SoulLink.Core;
 using SoulLink.Core.Shops;
 using SoulLink.Core.Sync;
+using SoulLink.SoulLinkCode.Cards;
 using SoulLink.SoulLinkCode.Linking;
 using SoulLink.SoulLinkCode.Ui;
 
@@ -141,6 +142,7 @@ internal static class ShopLinks
             if (Undone(shop, table, session.Me).FirstOrDefault(purchase => purchase.Slot == slot) is { } owed)
             {
                 Done.Add($"{table}|{owed.Sequence}");
+                MarkSource(table, owed);
                 return true;
             }
 
@@ -203,6 +205,19 @@ internal static class ShopLinks
         StatusLine.Set(
             rug,
             shop.Shoppers.Count > 1 ? StatusLine.Join(session, shop.Shoppers, (player, isMe) => Doing(shop, player, isMe)) : "");
+    }
+
+    /// <summary>
+    /// Marks a purchase as the source of what follows: a card bought links with the cards the others bought from the
+    /// same slot, and card removal's card screen links with the screens of everyone who bought removal.
+    /// </summary>
+    private static void MarkSource(string table, Purchase purchase)
+    {
+        CardLinksSync.GainingFrom(table, purchase.Slot.ToString(), purchase.Root);
+        DeckChoices.Acting(table, purchase.Slot.ToString(), () =>
+            Shop(table) is { } shop
+                ? shop.Purchases.Where(other => other.Slot == purchase.Slot).Select(other => other.Player).Distinct().ToList()
+                : []);
     }
 
     private static string Doing(ShopSession shop, PlayerId player, bool isMe)
@@ -277,6 +292,7 @@ internal static class ShopLinks
             }
 
             MainFile.Logger.Info($"Soul Link is buying {purchase.Slot}.");
+            MarkSource(table, purchase);
             _buying++;
             TaskHelper.RunSafely(Buy(entry, inventory));
         }

@@ -49,6 +49,26 @@ public sealed class LinkRegistry
         return id;
     }
 
+    /// <summary>Adds a card to an existing group, for a player who gained theirs after the group formed.</summary>
+    /// <returns>False when the group doesn't exist or already has a card of that player.</returns>
+    /// <exception cref="ArgumentException">The card is already linked.</exception>
+    public bool Add(LinkGroupId group, CardRef card)
+    {
+        if (_groupOf.ContainsKey(card))
+        {
+            throw new ArgumentException($"{card} is already linked.", nameof(card));
+        }
+
+        if (!_members.TryGetValue(group, out var members) || members.Exists(member => member.Owner == card.Owner))
+        {
+            return false;
+        }
+
+        members.Add(card);
+        _groupOf[card] = group;
+        return true;
+    }
+
     /// <summary>The card's group, or null if it's unlinked.</summary>
     public LinkGroupId? GroupOf(CardRef card) => _groupOf.TryGetValue(card, out var id) ? id : null;
 

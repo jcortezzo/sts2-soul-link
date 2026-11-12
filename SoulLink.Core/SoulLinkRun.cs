@@ -23,6 +23,7 @@ public sealed class SoulLinkRun
         ArgumentNullException.ThrowIfNull(settings);
         Settings = settings;
         Links = links ?? new LinkRegistry();
+        Gains = new GainLinks(Links);
         Matching = CardMatchingStrategies.Create(settings.CardMatching, Links);
         Tracker = new RunTracker(settings);
     }
@@ -30,6 +31,9 @@ public sealed class SoulLinkRun
     public SoulLinkSettings Settings { get; }
 
     public LinkRegistry Links { get; }
+
+    /// <summary>Links cards players report gaining from the same linked choice.</summary>
+    public GainLinks Gains { get; }
 
     /// <summary>The card matching strategy for the run's setting.</summary>
     public ICardMatchingStrategy Matching { get; }

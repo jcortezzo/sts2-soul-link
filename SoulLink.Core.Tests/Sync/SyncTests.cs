@@ -347,4 +347,34 @@ public class SyncTests
 
         Assert.Throws<InvalidDataException>(() => SyncCodec.ReadOp(packet));
     }
+
+    [Fact]
+    public void The_host_pairs_the_starting_decks_for_every_peer()
+    {
+        var network = new SyncTestNetwork();
+        StarterDeck[] decks =
+        [
+            new(Ana, [new(Card(Ana, 1), "Strike"), new(Card(Ana, 2), "Defend")]),
+            new(Ben, [new(Card(Ben, 1), "Defend"), new(Card(Ben, 2), "Strike")]),
+        ];
+
+        Assert.False(network.Send("links", Ben, SyncActions.LinksStarters, SyncState.StarterArgs(decks)).IsAccepted);
+        Assert.True(network.Send("links", Ana, SyncActions.LinksStarters, SyncState.StarterArgs(decks)).IsAccepted);
+
+        Assert.Equal(Ref(Ben, 2), network.Agreed(state => state.Run!.Links.LinkedCard(Ref(Ana, 1), Ben)));
+        Assert.Equal(Ref(Ben, 1), network.Agreed(state => state.Run!.Links.LinkedCard(Ref(Ana, 2), Ben)));
+    }
+
+    [Fact]
+    public void Gained_cards_link_the_same_way_on_every_peer()
+    {
+        var network = new SyncTestNetwork();
+        var source = GainLinks.SourceKey("f2/rewards-1/card-1", "slot:2", root: 1);
+
+        network.Send("links", Ben, SyncActions.LinksGained, SyncState.GainedArgs(source, [Card(Ben, 20)]));
+        network.Send("links", Cal, SyncActions.LinksGained, SyncState.GainedArgs(source, [Card(Cal, 20)]));
+
+        Assert.Equal(Ref(Cal, 20), network.Agreed(state => state.Run!.Links.LinkedCard(Ref(Ben, 20), Cal)));
+        Assert.Equal(1, network.Agreed(state => state.Run!.Links.GroupOf(Ref(Ben, 20))!.Value.Value));
+    }
 }

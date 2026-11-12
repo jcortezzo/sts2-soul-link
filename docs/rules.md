@@ -81,6 +81,8 @@ When several players choose a card from their deck for the same action, the firs
 
 The players in the action are the ones doing that same action at that moment: everyone who Smiths at a campfire, everyone who bought card removal, everyone who took the same event option. For multi-card picks (choose 2), the whole set must match.
 
+You pick on the game's own card screen as usual. With everyone agrees, confirming your pick is your vote, and the screen stays open until everyone's picks agree, so you can still change it; with first click, the first confirmed pick decides. Confirming waits a few seconds for teammates whose screens haven't opened yet. Cards offered on the spot rather than from your deck, like Room Full of Cheese's commons, match by slot instead.
+
 ### Linked cards (default)
 
 Cards are linked when they come from the same linked decision, so a link group holds at most one card per player.
@@ -90,6 +92,7 @@ Cards are linked when they come from the same linked decision, so a link group h
 - **Free choices:** players who decided freely together in nice mode link with each other.
 - **Solo cards:** a card only you gained (from a relic, an exclusive option or an effect on one player) is unlinked.
 - **Changes (proposed):** transforming keeps the link; upgrading and enchanting change nothing; removing takes the card out of its group; duplicating makes a new group of the copies.
+- **Saved runs:** links aren't saved with the run yet. A loaded run pairs the starting cards still in each deck again, and cards gained before the load are unlinked.
 
 ### Deck index
 
