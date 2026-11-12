@@ -2,6 +2,7 @@ using SoulLink.SoulLinkCode.Campfires;
 using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Rewards;
+using SoulLink.SoulLinkCode.Shops;
 
 namespace SoulLink.SoulLinkCode.Ui;
 
@@ -15,6 +16,7 @@ internal static class Views
         Refresh("event", EventView.Refresh);
         Refresh("chest", ChestLinks.Refresh);
         Refresh("campfire", CampfireLinks.Refresh);
+        Refresh("shop", ShopLinks.Refresh);
     }
 
     /// <summary>

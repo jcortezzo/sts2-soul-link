@@ -6,6 +6,7 @@ using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Linking;
 using SoulLink.SoulLinkCode.Rewards;
+using SoulLink.SoulLinkCode.Shops;
 
 namespace SoulLink.SoulLinkCode.Patches;
 
@@ -41,5 +42,6 @@ internal static class RunLifecyclePatches
         EventExecutor.Reset();
         ChestLinks.Reset();
         CampfireLinks.Reset();
+        ShopLinks.Reset();
     }
 }

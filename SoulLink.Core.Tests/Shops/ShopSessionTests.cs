@@ -91,6 +91,8 @@ public class ShopSessionTests
         Assert.Single(shop.OwedBy(Ben));
         Assert.Empty(shop.OwedBy(Cal));
         Assert.Equal(PurchaseVerdict.NoPotionSlot, shop.CanBuy(Ben, ShopSlot.Potion(2)).Verdict);
+        Assert.Equal(1, shop.FreePotionSlotsOf(Ana));
+        Assert.True(shop.IsIn(Cal));
     }
 
     [Fact]

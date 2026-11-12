@@ -83,6 +83,12 @@ public sealed class ShopSession
 
     public int GoldOf(PlayerId player) => Get(player).Gold;
 
+    /// <summary>The player's free potion slots, counting slots set aside for potions they owe.</summary>
+    public int FreePotionSlotsOf(PlayerId player) => Get(player).FreePotionSlots;
+
+    /// <summary>Whether the player has entered the shop.</summary>
+    public bool IsIn(PlayerId player) => _shoppers.ContainsKey(player);
+
     /// <summary>
     /// Updates a player's gold from the game. Obligations the player can no longer pay are dropped, with earlier
     /// obligations keeping first claim on the gold.

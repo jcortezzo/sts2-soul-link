@@ -7,6 +7,7 @@ using SoulLink.SoulLinkCode.Campfires;
 using SoulLink.SoulLinkCode.Chests;
 using SoulLink.SoulLinkCode.Events;
 using SoulLink.SoulLinkCode.Rewards;
+using SoulLink.SoulLinkCode.Shops;
 using SoulLink.SoulLinkCode.Ui;
 
 namespace SoulLink.SoulLinkCode;
@@ -26,6 +27,7 @@ public partial class MainFile : Node
         SoulLinkSession.StateChanged += EventExecutor.Schedule;
         SoulLinkSession.StateChanged += ChestLinks.Schedule;
         SoulLinkSession.StateChanged += CampfireLinks.Schedule;
+        SoulLinkSession.StateChanged += ShopLinks.Schedule;
 
         Harmony harmony = new(ModId);
         harmony.PatchAll(Assembly.GetExecutingAssembly());
