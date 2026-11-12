@@ -53,7 +53,8 @@ and `SoulLink.json` into the game's `mods/SoulLink` folder. If the game isn't fo
 `Directory.Build.props` file next to the project. Godot isn't needed: the `.pck` is packed during the build.
 
 You need the .NET SDK 9 or later, and [BaseLib](https://github.com/Alchyr/BaseLib-StS2) subscribed on the Steam
-Workshop (ID 3737335127).
+Workshop (ID 3737335127) and turned on in the game's mod list (Settings → Mods). Turn it on with only one game window
+open, then restart: a second window that's still running can save its own copy of the setting over yours.
 
 ## Test
 
@@ -70,7 +71,7 @@ start "" SlayTheSpire2.exe -fastmp host_standard -wpos 0 0
 start "" SlayTheSpire2.exe -fastmp join -wpos 960 0
 ```
 
-The host opens a standard co-op lobby and the client joins it after a moment; more clients need `-clientId 1001`, `1002` and so on. To watch the mod's log lines live, turn on "Open log window on startup" under Mod Configuration → BaseLib; the log is also saved in `%AppData%\SlayTheSpire2\logs\godot.log`.
+The host opens a standard co-op lobby and the client joins it after a moment; more clients need `-clientId 1001`, `1002` and so on. Each window's log should show `Soul Link ... loaded` near the top and `Soul Link session started as host` (or `client`) when the run starts; `depends on mods which have not been loaded: BaseLib` means BaseLib is still turned off. To watch the mod's log lines live, turn on "Open log window on startup" under Mod Configuration → BaseLib; the log is also saved in `%AppData%\SlayTheSpire2\logs\godot.log`.
 
 ## Contributing
 

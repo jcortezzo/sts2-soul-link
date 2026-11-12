@@ -32,7 +32,28 @@ public partial class MainFile : Node
         SoulLinkSession.StateChanged += ShopLinks.Schedule;
         SoulLinkSession.StateChanged += DeckChoices.Schedule;
 
+        // Each patch class is applied on its own, so one that no longer fits the game can't stop the others.
         Harmony harmony = new(ModId);
-        harmony.PatchAll(Assembly.GetExecutingAssembly());
+        var failed = 0;
+        foreach (var type in AccessTools.GetTypesFromAssembly(Assembly.GetExecutingAssembly()))
+        {
+            if (type.GetCustomAttribute<HarmonyPatch>() is null)
+            {
+                continue;
+            }
+
+            try
+            {
+                harmony.CreateClassProcessor(type).Patch();
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                Logger.Error($"Soul Link couldn't patch {type.Name}: {ex}");
+            }
+        }
+
+        var version = Assembly.GetExecutingAssembly().GetName().Version;
+        Logger.Info($"Soul Link {version} loaded: {harmony.GetPatchedMethods().Count()} game methods patched, {failed} patch classes failed.");
     }
 }
