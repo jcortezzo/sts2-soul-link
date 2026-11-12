@@ -43,6 +43,9 @@ internal sealed class SoulLinkSession
     /// <summary>Raised after any operation is applied, so lock indicators can refresh.</summary>
     public event Action<SyncNotice>? Changed;
 
+    /// <summary>Raised after any operation is applied in whichever session is current.</summary>
+    public static event Action? StateChanged;
+
     /// <summary>The session for the current co-op run, or null outside co-op runs.</summary>
     public static SoulLinkSession? Current { get; private set; }
 
@@ -191,6 +194,7 @@ internal sealed class SoulLinkSession
         }
 
         Changed?.Invoke(notice);
+        StateChanged?.Invoke();
     }
 
     private Action<bool>? TakePending(SyncOp op)
