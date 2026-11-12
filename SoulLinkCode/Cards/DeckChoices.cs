@@ -36,12 +36,6 @@ internal static class DeckChoices
     /// <summary>How long a pick waits for teammates' screens to open before it's sent anyway.</summary>
     private const ulong HoldLimitMsec = 8000;
 
-    /// <summary>
-    /// How long a screen may go without being part of its linked choice before it's left to the player, in case its
-    /// join never reached the host.
-    /// </summary>
-    private const ulong JoinLimitMsec = 5000;
-
     private static readonly AccessTools.FieldRef<NCardGridSelectionScreen, IReadOnlyList<CardModel>?> CardsField =
         AccessTools.FieldRefAccess<NCardGridSelectionScreen, IReadOnlyList<CardModel>?>("_cards");
 
@@ -110,28 +104,18 @@ internal static class DeckChoices
         var number = ScreensPerContext[context.Key] = ScreensPerContext.GetValueOrDefault(context.Key) + 1;
         var table = $"{context.Key}/cards-{number}";
         var pickCount = Math.Max(1, PrefsOf(screen)?.MaxSelect ?? 1);
-        _open = new OpenScreen(screen, table, fromDeck, pickCount, cards, context.SameChoice, Time.GetTicksMsec());
+        _open = new OpenScreen(screen, table, fromDeck, pickCount, cards, context.SameChoice);
         MainFile.Logger.Info($"Soul Link linked the card screen {table}: {cards.Count} {(fromDeck ? "deck" : "offered")} card(s), pick {pickCount}.");
         var args = fromDeck
             ? CardTable.JoinArgs(pickCount, ids.Select(id => new ScreenCard(id!.Value)))
             : OptionTable.JoinArgs(pickCount, Enumerable.Range(1, cards.Count).Select(slot => new DecisionOption(OptionKey.Slot(slot))));
         session.Submit(table, fromDeck ? SyncActions.CardsJoin : SyncActions.OptionsJoin, args, accepted =>
-        {
-            if (!accepted)
-            {
-                Unlink(screen, null, "the host refused to add it to the linked choice");
-            }
-        });
+            MainFile.Logger.Info($"Soul Link's card screen {table} {(accepted ? "joined" : "was refused by")} the host."));
         if (!fromDeck)
         {
             // Cards offered on the spot are rolled on each player's own machine, so they're shared for slot peek.
             var slots = cards.Select((card, i) => new KeyValuePair<string, string>(OptionKey.Slot(i + 1).Value, PeekTips.CardValue(card)));
             session.Submit(table, SyncActions.PeekSet, SyncState.PeekArgs(slots));
-        }
-
-        if (Engine.GetMainLoop() is SceneTree tree)
-        {
-            tree.CreateTimer(JoinLimitMsec / 1000.0 + 0.5).Timeout += Schedule;
         }
 
         Schedule();
@@ -341,13 +325,6 @@ internal static class DeckChoices
             return;
         }
 
-        // A screen that never became part of its linked choice can't be decided there, so it's left to the player.
-        if (decision is null && Time.GetTicksMsec() - open.OpenedAt > JoinLimitMsec)
-        {
-            Unlink(open.Screen, null, "it never became part of the linked choice");
-            return;
-        }
-
         if (open.Held is not { } held)
         {
             return;
@@ -373,10 +350,7 @@ internal static class DeckChoices
         ClickGate.Request([op], accepted => Answered(open.Screen, held.Cards, accepted));
     }
 
-    /// <summary>
-    /// The host's answer to a pick. A refused pick can be made again; one refused because the screen isn't part of the
-    /// linked choice is the player's own, so the screen finishes with it.
-    /// </summary>
+    /// <summary>The host's answer to a pick. A refused pick can be made again.</summary>
     private static void Answered(NCardGridSelectionScreen screen, IReadOnlyList<CardModel> pick, bool accepted)
     {
         if (_open is not { } open || !ReferenceEquals(open.Screen, screen))
@@ -384,49 +358,11 @@ internal static class DeckChoices
             return;
         }
 
-        if (accepted)
+        _open = accepted ? open with { Sending = null, Sent = pick } : open with { Sending = null, Sent = null };
+        MainFile.Logger.Info($"Soul Link's pick on {open.Table} was {(accepted ? "taken" : "refused")} (in the linked choice: {Decision(open) is not null}).");
+        if (!accepted)
         {
-            _open = open with { Sending = null, Sent = pick };
-            return;
-        }
-
-        _open = open with { Sending = null, Sent = null };
-        if (Decision(open) is null)
-        {
-            Unlink(screen, pick, "its pick was refused and it isn't part of the linked choice");
-            return;
-        }
-
-        MainFile.Logger.Info($"Soul Link's pick on {open.Table} wasn't taken, so it can be picked again.");
-        Views.Refresh("card choice", Refresh);
-    }
-
-    /// <summary>
-    /// Stops linking a screen that can't be decided in its linked choice, so the player isn't stuck: it finishes with
-    /// the pick they already confirmed, or waits for them to pick as usual.
-    /// </summary>
-    private static void Unlink(NCardGridSelectionScreen screen, IReadOnlyList<CardModel>? pick, string reason)
-    {
-        if (_open is not { } open || !ReferenceEquals(open.Screen, screen))
-        {
-            return;
-        }
-
-        _open = null;
-        MainFile.Logger.Warn($"Soul Link unlinked the card screen {open.Table}: {reason}. The pick there is the player's own.");
-        var grid = GridField(screen);
-        foreach (var card in open.Cards)
-        {
-            if (grid?.GetCardHolder(card) is { } holder && GodotObject.IsInstanceValid(holder))
-            {
-                Dim.Set(holder, false);
-                VoteIcons.Clear(holder);
-            }
-        }
-
-        if ((pick ?? open.Held?.Cards ?? open.Sending) is { Count: > 0 } confirmed)
-        {
-            Finish(screen, confirmed);
+            Views.Refresh("card choice", Refresh);
         }
     }
 
@@ -492,7 +428,6 @@ internal static class DeckChoices
     private sealed record HeldPick(IReadOnlyList<CardModel> Cards, ulong Since);
 
     /// <summary>The local player's linked card screen.</summary>
-    /// <param name="OpenedAt">When it opened, in engine ticks.</param>
     /// <param name="Held">A confirmed pick waiting for teammates' screens.</param>
     /// <param name="HoldStarted">When the player first confirmed a pick, in engine ticks.</param>
     /// <param name="Sending">A pick on its way to the host.</param>
@@ -504,7 +439,6 @@ internal static class DeckChoices
         int PickCount,
         IReadOnlyList<CardModel> Cards,
         Func<IReadOnlyList<PlayerId>> SameChoice,
-        ulong OpenedAt,
         HeldPick? Held = null,
         ulong? HoldStarted = null,
         IReadOnlyList<CardModel>? Sending = null,
