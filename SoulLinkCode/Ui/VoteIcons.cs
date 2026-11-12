@@ -7,13 +7,19 @@ namespace SoulLink.SoulLinkCode.Ui;
 
 /// <summary>
 /// Character portraits on an option for each player who voted for or chose it, like the game's own vote icons on
-/// group events and chests, for screens that don't have them, such as cards and shop slots.
+/// group events and chests, for screens that don't have them, such as cards and shop slots. A player who has only
+/// selected the option so far, without confirming, shows faded.
 /// </summary>
 internal static class VoteIcons
 {
     private const string RowName = "SoulLinkVotes";
     private const string IconScene = "ui/multiplayer_vote_icon";
     private const string PlayerMeta = "soul_link_player";
+    private const string AlphaMeta = "soul_link_alpha";
+    private const string FadeMeta = "soul_link_fade";
+
+    /// <summary>How visible a portrait is for a player who has selected the option but not confirmed it.</summary>
+    private const float TentativeAlpha = 0.45f;
 
     /// <summary>
     /// How tall the portraits on a card are, as a share of the card's height. The game's portraits are sized for event
@@ -45,7 +51,17 @@ internal static class VoteIcons
     /// How tall the portraits are as a share of the option's height, like <see cref="OnCards"/>; 0 keeps the game's
     /// size.
     /// </param>
-    public static void Show(Control target, Rect2 bounds, IReadOnlyList<PlayerId> players, Placement placement = Placement.Above, float relativeHeight = 0)
+    /// <param name="tentative">
+    /// Players among <paramref name="players"/> who have only selected the option so far, without confirming. Their
+    /// portraits are faded.
+    /// </param>
+    public static void Show(
+        Control target,
+        Rect2 bounds,
+        IReadOnlyList<PlayerId> players,
+        Placement placement = Placement.Above,
+        float relativeHeight = 0,
+        IReadOnlyCollection<PlayerId>? tentative = null)
     {
         if (!GodotObject.IsInstanceValid(target))
         {
@@ -83,14 +99,21 @@ internal static class VoteIcons
 
         foreach (var player in players)
         {
-            if (row.GetChildren().OfType<Control>().Any(child => PlayerOf(child) == player) || Icon(player) is not { } icon)
+            var alpha = tentative?.Contains(player) == true ? TentativeAlpha : 1f;
+            if (row.GetChildren().OfType<Control>().FirstOrDefault(child => PlayerOf(child) == player) is { } shown)
+            {
+                FadeTo(shown, alpha);
+                continue;
+            }
+
+            if (Icon(player) is not { } icon)
             {
                 continue;
             }
 
             row.AddChild(icon);
             icon.Modulate = new Color(1f, 1f, 1f, 0f);
-            icon.CreateTween().TweenProperty(icon, "modulate:a", 1f, 0.2);
+            FadeTo(icon, alpha);
         }
 
         var natural = row.GetCombinedMinimumSize();
@@ -125,6 +148,27 @@ internal static class VoteIcons
         {
             row.QueueFree();
         }
+    }
+
+    /// <summary>Fades a portrait to the alpha for its player's state, unless it's on its way there already.</summary>
+    private static void FadeTo(Control icon, float alpha)
+    {
+        if (icon.HasMeta(AlphaMeta) && Mathf.IsEqualApprox(icon.GetMeta(AlphaMeta).AsSingle(), alpha))
+        {
+            return;
+        }
+
+        icon.SetMeta(AlphaMeta, alpha);
+
+        // A new fade replaces the running one rather than fighting it over the alpha.
+        if (icon.HasMeta(FadeMeta) && icon.GetMeta(FadeMeta).AsGodotObject() is Tween running && GodotObject.IsInstanceValid(running))
+        {
+            running.Kill();
+        }
+
+        var tween = icon.CreateTween();
+        tween.TweenProperty(icon, "modulate:a", alpha, 0.2);
+        icon.SetMeta(FadeMeta, tween);
     }
 
     private static PlayerId? PlayerOf(Control icon) =>

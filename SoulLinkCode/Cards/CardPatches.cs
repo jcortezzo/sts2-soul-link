@@ -117,6 +117,66 @@ internal static class CardScreenFinishPatches
     }
 }
 
+/// <summary>
+/// On linked "choose N" card screens: shares the selection after each click so teammates see it before anyone
+/// confirms, and stops a full selection from growing once the mod has closed the game's preview.
+/// </summary>
+[HarmonyPatch]
+internal static class CardScreenClickPatches
+{
+    private static IEnumerable<MethodBase> TargetMethods() =>
+        new[]
+        {
+            AccessTools.DeclaredMethod(typeof(NDeckUpgradeSelectScreen), "OnCardClicked"),
+            AccessTools.DeclaredMethod(typeof(NDeckCardSelectScreen), "OnCardClicked"),
+            AccessTools.DeclaredMethod(typeof(NDeckEnchantSelectScreen), "OnCardClicked"),
+            AccessTools.DeclaredMethod(typeof(NDeckTransformSelectScreen), "OnCardClicked"),
+            AccessTools.DeclaredMethod(typeof(NSimpleCardSelectScreen), "OnCardClicked"),
+        }.OfType<MethodBase>();
+
+    [HarmonyPrefix]
+    private static bool BeforeClick(NCardGridSelectionScreen __instance, CardModel card) =>
+        !Guard.Show("check a card click", () => DeckChoices.BlocksClick(__instance, card));
+
+    [HarmonyPostfix]
+    private static void AfterClick(NCardGridSelectionScreen __instance) =>
+        Guard.Run("share a card selection", () => DeckChoices.SelectionChanged(__instance));
+}
+
+/// <summary>
+/// On linked "choose N" card screens, cancelling the game's preview only closes it: the selection stays, so teammates
+/// keep seeing it, and the player unselects cards one at a time instead.
+/// </summary>
+[HarmonyPatch]
+internal static class CardScreenCancelPatches
+{
+    private static IEnumerable<MethodBase> TargetMethods() =>
+        new[]
+        {
+            AccessTools.DeclaredMethod(typeof(NDeckUpgradeSelectScreen), "CancelSelection"),
+            AccessTools.DeclaredMethod(typeof(NDeckCardSelectScreen), "CancelSelection"),
+            AccessTools.DeclaredMethod(typeof(NDeckEnchantSelectScreen), "CancelSelection"),
+            AccessTools.DeclaredMethod(typeof(NDeckTransformSelectScreen), "CancelSelection"),
+        }.OfType<MethodBase>();
+
+    [HarmonyPrefix]
+    private static void BeforeCancel(NCardGridSelectionScreen __instance, out IReadOnlyList<CardModel>? __state)
+    {
+        IReadOnlyList<CardModel>? kept = null;
+        Guard.Run("keep a card selection", () => kept = DeckChoices.KeptOnCancel(__instance));
+        __state = kept;
+    }
+
+    [HarmonyPostfix]
+    private static void AfterCancel(NCardGridSelectionScreen __instance, IReadOnlyList<CardModel>? __state)
+    {
+        if (__state is not null)
+        {
+            Guard.Run("put a card selection back", () => DeckChoices.Restore(__instance, __state));
+        }
+    }
+}
+
 /// <summary>The card screen fields the patches swap.</summary>
 internal static class CardScreenAccess
 {

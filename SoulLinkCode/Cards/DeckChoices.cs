@@ -24,9 +24,16 @@ namespace SoulLink.SoulLinkCode.Cards;
 /// matching setting; cards offered on the spot, like Room Full of Cheese's commons, are matched by slot.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The player picks on the game's own screen as usual. When the screen would finish with their pick, the pick goes to
 /// the host as a vote or a first-click choice instead and the screen stays open, so with everyone agrees they can
 /// change it. Once the host commits the local player's cards, the screen finishes with those.
+/// </para>
+/// <para>
+/// On "choose N" screens, like Yummy Cookie's four upgrades, each click also shares the selection so far, which
+/// teammates see as faded portraits until it's confirmed. Confirming or cancelling the game's preview keeps the
+/// selection; unselecting a card takes a confirmed pick back, so the player has to confirm again.
+/// </para>
 /// </remarks>
 internal static class DeckChoices
 {
@@ -46,6 +53,9 @@ internal static class DeckChoices
         AccessTools.FieldRefAccess<NCardGridSelectionScreen, NCardGrid?>("_grid");
 
     private static readonly Dictionary<string, int> ScreensPerContext = new(StringComparer.Ordinal);
+
+    /// <summary>Each screen type's field holding the cards the player has selected so far.</summary>
+    private static readonly Dictionary<Type, FieldInfo?> SelectedFields = new();
 
     private static ChoiceContext? _context;
     private static OpenScreen? _open;
@@ -144,10 +154,21 @@ internal static class DeckChoices
             return;
         }
 
+        // The selection that's confirmed is shared first, so teammates see it before the pick arrives.
+        if (open.SharesSelection && !SameCards(open.Marked, picked))
+        {
+            open = Mark(open, picked);
+        }
+
         // Confirming the pick that's already the player's vote, or on its way, keeps it rather than taking it back. A pick
         // whose answer never came is sent again once the click gate stops waiting for that answer.
         if (SameCards(open.Sent, picked) || (SameCards(open.Sending, picked) && ClickGate.IsBusy) || SameCards(open.Held?.Cards, picked))
         {
+            if (open.SharesSelection)
+            {
+                Callable.From(() => BackToCards(screen)).CallDeferred();
+            }
+
             return;
         }
 
@@ -162,7 +183,8 @@ internal static class DeckChoices
     /// <summary>
     /// Takes the player from their pick's preview back to the cards, as the preview's back button does, while the
     /// pick waits for teammates: their portrait shows on the card they picked and teammates' portraits on theirs, and
-    /// they can still pick another. Screens without a preview stay as they are.
+    /// they can still pick another. On "choose N" screens the selection stays, so they can unselect a card to change
+    /// it. Screens without a preview stay as they are.
     /// </summary>
     private static void BackToCards(NCardGridSelectionScreen screen)
     {
@@ -188,6 +210,59 @@ internal static class DeckChoices
         Callable.From(Run).CallDeferred();
     }
 
+    /// <summary>
+    /// Whether a click on a linked "choose N" screen should be ignored: once the selection is full, a card that isn't
+    /// selected can't be added, and the player unselects one first. The game itself only allows that while its
+    /// preview is open, which the mod closes so the player can see teammates' selections.
+    /// </summary>
+    public static bool BlocksClick(NCardGridSelectionScreen screen, CardModel card) =>
+        SharedScreen(screen) is { } open
+        && SelectedOn(screen) is { } selected
+        && selected.Count >= open.PickCount
+        && !selected.Contains(card);
+
+    /// <summary>
+    /// After a click on a linked "choose N" screen: shares the selection so far with the host, so teammates see it
+    /// before anyone confirms. A selection that no longer matches the player's confirmed pick takes that pick back.
+    /// </summary>
+    public static void SelectionChanged(NCardGridSelectionScreen screen)
+    {
+        if (SharedScreen(screen) is not { } open || SelectedOn(screen) is not { } selected)
+        {
+            return;
+        }
+
+        var current = open.Cards.Where(selected.Contains).ToList();
+        if (!SameCards(open.Marked ?? [], current))
+        {
+            Mark(open, current);
+        }
+    }
+
+    /// <summary>The selection to put back after the game's cancel clears it, on a linked "choose N" screen.</summary>
+    public static IReadOnlyList<CardModel>? KeptOnCancel(NCardGridSelectionScreen screen) =>
+        SharedScreen(screen) is not null && SelectedOn(screen) is { Count: > 0 } selected ? selected.ToList() : null;
+
+    /// <summary>Puts a selection back on the screen after the game's cancel cleared it.</summary>
+    public static void Restore(NCardGridSelectionScreen screen, IReadOnlyList<CardModel> kept)
+    {
+        if (SelectedOn(screen) is not { } selected || GridField(screen) is not { } grid || !GodotObject.IsInstanceValid(grid))
+        {
+            return;
+        }
+
+        foreach (var card in kept)
+        {
+            if (selected.Add(card))
+            {
+                grid.HighlightCard(card);
+            }
+        }
+
+        SelectionChanged(screen);
+        Refresh();
+    }
+
     /// <summary>Shows who picked which card, and dims cards the local player can't pick.</summary>
     public static void Refresh()
     {
@@ -198,6 +273,12 @@ internal static class DeckChoices
 
         var grid = GridField(open.Screen);
         var decision = Decision(open);
+        var views = decision?.Views.ToList();
+
+        // On "choose N" screens the local player's portrait follows their own screen: solid on a confirmed pick, faded
+        // on cards they've only selected. The local copy of the linked state can lag behind their clicks.
+        var selected = open.SharesSelection ? SelectedOn(open.Screen) : null;
+        var confirmed = open.Held?.Cards ?? open.Sending ?? (open.SharesSelection ? open.Sent : null);
         foreach (var card in open.Cards)
         {
             if (grid?.GetCardHolder(card) is not { } holder || !GodotObject.IsInstanceValid(holder))
@@ -205,20 +286,31 @@ internal static class DeckChoices
                 continue;
             }
 
-            var view = decision?.Views.FirstOrDefault(entry => entry.Card == card);
+            var view = views?.FirstOrDefault(entry => entry.Card == card);
             Dim.Set(holder, view?.State is OptionState.Locked or OptionState.GreyedOut or OptionState.NotChosen);
             var backers = new List<PlayerId>();
-            if (open.Held?.Cards.Contains(card) == true || open.Sending?.Contains(card) == true)
+            var tentative = new List<PlayerId>();
+            if (confirmed?.Contains(card) == true)
             {
                 backers.Add(session.Me);
+            }
+            else if (selected?.Contains(card) == true)
+            {
+                backers.Add(session.Me);
+                tentative.Add(session.Me);
             }
 
             if (view is { } shown)
             {
-                backers.AddRange(shown.Backers.Where(player => !backers.Contains(player)));
+                backers.AddRange(shown.Backers.Where(player => !backers.Contains(player) && (!open.SharesSelection || player != session.Me)));
+                foreach (var marker in shown.Markers.Where(player => !backers.Contains(player)))
+                {
+                    backers.Add(marker);
+                    tentative.Add(marker);
+                }
             }
 
-            VoteIcons.Show(holder, VoteIcons.BoundsOf(holder, holder.Hitbox), backers, relativeHeight: VoteIcons.OnCards);
+            VoteIcons.Show(holder, VoteIcons.BoundsOf(holder, holder.Hitbox), backers, relativeHeight: VoteIcons.OnCards, tentative: tentative);
         }
     }
 
@@ -383,6 +475,61 @@ internal static class DeckChoices
     private static bool SameCards(IReadOnlyList<CardModel>? cards, IReadOnlyList<CardModel> picked) =>
         cards is not null && cards.Count == picked.Count && cards.All(card => picked.Contains(card));
 
+    /// <summary>The local player's linked screen, if it's this one and shares its selection.</summary>
+    private static OpenScreen? SharedScreen(NCardGridSelectionScreen screen) =>
+        _open is { SharesSelection: true } open && ReferenceEquals(open.Screen, screen) && GodotObject.IsInstanceValid(screen) ? open : null;
+
+    /// <summary>The cards the player has selected on the screen so far, or null for a screen that doesn't keep them.</summary>
+    private static HashSet<CardModel>? SelectedOn(NCardGridSelectionScreen screen)
+    {
+        var type = screen.GetType();
+        if (!SelectedFields.TryGetValue(type, out var field))
+        {
+            field = AccessTools.Field(type, "_selectedCards");
+            SelectedFields[type] = field;
+        }
+
+        return field?.GetValue(screen) as HashSet<CardModel>;
+    }
+
+    /// <summary>
+    /// Sends the player's selection so far to the host, with the screen's join until this peer has seen it accepted.
+    /// The host takes back a confirmed pick that doesn't match it, so this peer stops counting on that pick too.
+    /// </summary>
+    private static OpenScreen Mark(OpenScreen open, IReadOnlyList<CardModel> selection)
+    {
+        var marked = open with
+        {
+            Marked = selection,
+            Held = SameCards(open.Held?.Cards, selection) ? open.Held : null,
+            Sending = SameCards(open.Sending, selection) ? open.Sending : null,
+            Sent = SameCards(open.Sent, selection) ? open.Sent : null,
+        };
+        _open = marked;
+        if (OptionLinks.Session is not { } session)
+        {
+            return marked;
+        }
+
+        if (!session.HasJoined(open.Join.Table, open.Join.Action, open.Join.Args))
+        {
+            session.Submit(open.Join.Table, open.Join.Action, open.Join.Args);
+        }
+
+        var args = open.FromDeck
+            ? selection.Select(card => SyncArgs.Number(CardIds.IdOf(card)!.Value.Value)).ToList()
+            : selection.Select(card => OptionKey.Slot(IndexOf(open.Cards, card) + 1).Value).ToList();
+        session.Submit(open.Table, open.FromDeck ? SyncActions.CardsMark : SyncActions.OptionsMark, args, accepted =>
+        {
+            if (!accepted)
+            {
+                MainFile.Logger.Warn($"Soul Link's selection of {selection.Count} card(s) on {open.Table} was refused.");
+            }
+        });
+        Views.Refresh("card choice", Refresh);
+        return marked;
+    }
+
     private static void CheckHeldLater()
     {
         if (_checkingHeld || Engine.GetMainLoop() is not SceneTree tree)
@@ -447,6 +594,7 @@ internal static class DeckChoices
     /// <param name="HoldStarted">When the player first confirmed a pick, in engine ticks.</param>
     /// <param name="Sending">A pick on its way to the host.</param>
     /// <param name="Sent">The pick the host took as the player's vote or choice.</param>
+    /// <param name="Marked">On "choose N" screens, the selection last shared with the host.</param>
     private sealed record OpenScreen(
         NCardGridSelectionScreen Screen,
         string Table,
@@ -458,10 +606,18 @@ internal static class DeckChoices
         HeldPick? Held = null,
         ulong? HoldStarted = null,
         IReadOnlyList<CardModel>? Sending = null,
-        IReadOnlyList<CardModel>? Sent = null);
+        IReadOnlyList<CardModel>? Sent = null,
+        IReadOnlyList<CardModel>? Marked = null)
+    {
+        /// <summary>Whether the screen shares the selection before it's confirmed: "choose N" screens.</summary>
+        public bool SharesSelection => PickCount > 1;
+    }
 
-    /// <summary>How one card looks on the local player's screen: its state, and who picked it or holds them to it.</summary>
-    private sealed record CardView(CardModel Card, OptionState State, IReadOnlyList<PlayerId> Backers);
+    /// <summary>
+    /// How one card looks on the local player's screen: its state, who picked it or holds them to it, and which
+    /// teammates have selected it without confirming.
+    /// </summary>
+    private sealed record CardView(CardModel Card, OptionState State, IReadOnlyList<PlayerId> Backers, IReadOnlyList<PlayerId> Markers);
 
     /// <summary>The local copy of a linked card screen's decision, by card id for deck cards or by slot for offered cards.</summary>
     private sealed record LinkedPick(IReadOnlyList<PlayerId> Participants, OpenScreen Open, CardChoiceDecision? Cards, OptionDecision? Slots)
@@ -498,13 +654,13 @@ internal static class DeckChoices
                     if (Cards is not null && CardIds.IdOf(card) is { } id)
                     {
                         var view = Cards.ViewOptions(me).FirstOrDefault(entry => entry.Option == id);
-                        yield return new CardView(card, view.State, Backers(Cards, me, id, view));
+                        yield return new CardView(card, view.State, Backers(Cards, me, id, view), Cards.MarkersFor(me, id));
                     }
                     else if (Slots is not null)
                     {
                         var key = OptionKey.Slot(IndexOf(Open.Cards, card) + 1);
                         var view = Slots.ViewOptions(me).FirstOrDefault(entry => entry.Option == key);
-                        yield return new CardView(card, view.State, Backers(Slots, me, key, view));
+                        yield return new CardView(card, view.State, Backers(Slots, me, key, view), Slots.MarkersFor(me, key));
                     }
                 }
             }

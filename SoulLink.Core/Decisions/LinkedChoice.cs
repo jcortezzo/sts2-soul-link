@@ -30,6 +30,10 @@ namespace SoulLink.Core.Decisions;
 /// everyone agrees, it's a vote, and a choice is committed once everyone who could take it has voted for it. Both
 /// build on the same commits and bindings.
 /// </para>
+/// <para>
+/// On "choose N" screens players also share what they've selected before confirming, through <see cref="Mark"/>, so
+/// they can line up. Marks only show; changing them takes back a vote that no longer matches.
+/// </para>
 /// </remarks>
 /// <typeparam name="TAtom">One pickable option, like an <see cref="OptionKey"/> or a card.</typeparam>
 public abstract class LinkedChoice<TAtom>
@@ -39,8 +43,10 @@ public abstract class LinkedChoice<TAtom>
     private readonly List<Commit<TAtom>> _commits = [];
     private readonly Dictionary<PlayerId, Commit<TAtom>> _decided = new();
     private readonly Dictionary<PlayerId, Vote> _votes = new();
+    private readonly Dictionary<PlayerId, Marking> _marks = new();
     private LinkMode? _lockedMode;
     private int _voteSequence;
+    private int _markSequence;
 
     protected LinkedChoice(LinkMode mode, int pickCount, WhoDecides whoDecides)
     {
@@ -144,6 +150,67 @@ public abstract class LinkedChoice<TAtom>
 
     /// <summary>Takes back a player's vote, for example when their options change.</summary>
     public void ClearVote(PlayerId player) => _votes.Remove(player);
+
+    /// <summary>What the undecided player has selected so far on a "choose N" screen, or empty.</summary>
+    public IReadOnlyList<TAtom> MarksOf(PlayerId player) => _marks.TryGetValue(player, out var marking) ? marking.Items : [];
+
+    /// <summary>
+    /// Records what the player has selected so far on a "choose N" screen, before they confirm, so the others can see
+    /// it and line up with it. Replaces their earlier selection. A vote that doesn't match the new selection is taken
+    /// back, so a player who changes their selection after confirming has to confirm again before it can be decided.
+    /// Marks never commit anything. Players who aren't on the decision or have decided are ignored.
+    /// </summary>
+    public void Mark(PlayerId player, IEnumerable<TAtom> selected)
+    {
+        ArgumentNullException.ThrowIfNull(selected);
+        if (!IsParticipant(player) || _decided.ContainsKey(player))
+        {
+            return;
+        }
+
+        var items = selected.Distinct().ToList();
+        if (_votes.TryGetValue(player, out var vote) && !vote.Choice.Equals(new Selection<TAtom>(items)))
+        {
+            _votes.Remove(player);
+        }
+
+        if (items.Count == 0)
+        {
+            _marks.Remove(player);
+            return;
+        }
+
+        // A player keeps their place in the order while they change their selection, so portraits don't jump around.
+        var sequence = _marks.TryGetValue(player, out var earlier) ? earlier.Sequence : ++_markSequence;
+        _marks[player] = new Marking(items, sequence);
+    }
+
+    /// <summary>
+    /// The other undecided players whose selection so far, matched to this player's options the way a pick would be,
+    /// includes this option, in the order they started selecting. Shows who is choosing what before anyone confirms.
+    /// </summary>
+    public IReadOnlyList<PlayerId> MarkersFor(PlayerId player, TAtom option)
+    {
+        RequireParticipant(player);
+        var markers = new List<PlayerId>();
+        foreach (var (other, marking) in _marks.OrderBy(entry => entry.Value.Sequence))
+        {
+            if (other == player || !IsParticipant(other))
+            {
+                continue;
+            }
+
+            // A card that left the player's screen since they selected it can't be matched any more.
+            var options = Options(other).ToHashSet();
+            var shown = marking.Items.Where(options.Contains).ToList();
+            if (shown.Count > 0 && TryResolve(Describe(other, new Selection<TAtom>(shown)), player, out var mine) && mine.Contains(option))
+            {
+                markers.Add(other);
+            }
+        }
+
+        return markers;
+    }
 
     /// <summary>
     /// A player's click. With first click, it commits the choice and then makes the same choice for everyone who has to
@@ -387,6 +454,7 @@ public abstract class LinkedChoice<TAtom>
         _participants.Remove(player);
         _decided.Remove(player);
         _votes.Remove(player);
+        _marks.Remove(player);
     }
 
     /// <summary>Every option this player sees, available or not, in display order.</summary>
@@ -438,6 +506,7 @@ public abstract class LinkedChoice<TAtom>
         _commits.Add(commit);
         _decided[commit.Player] = commit;
         _votes.Remove(commit.Player);
+        _marks.Remove(commit.Player);
     }
 
     private void RecordVote(PlayerId player, Selection<TAtom> choice)
@@ -675,4 +744,6 @@ public abstract class LinkedChoice<TAtom>
     }
 
     private sealed record Vote(Selection<TAtom> Choice, int Sequence);
+
+    private sealed record Marking(IReadOnlyList<TAtom> Items, int Sequence);
 }

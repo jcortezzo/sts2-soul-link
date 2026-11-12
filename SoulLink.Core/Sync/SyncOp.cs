@@ -94,6 +94,12 @@ public static class SyncActions
     /// <summary>Clicks options. Args: the keys.</summary>
     public const string OptionsChoose = "options.choose";
 
+    /// <summary>
+    /// Shares the options the player has selected so far on a "choose N" screen, before confirming. Replaces their
+    /// earlier selection and takes back a vote that doesn't match it. Args: the keys, none to clear.
+    /// </summary>
+    public const string OptionsMark = "options.mark";
+
     /// <summary>Leaves an option decision.</summary>
     public const string OptionsLeave = "options.leave";
 
@@ -102,6 +108,12 @@ public static class SyncActions
 
     /// <summary>Clicks cards. Args: the card ids.</summary>
     public const string CardsChoose = "cards.choose";
+
+    /// <summary>
+    /// Shares the cards the player has selected so far on a "choose N" screen, before confirming. Replaces their
+    /// earlier selection and takes back a vote that doesn't match it. Args: the card ids, none to clear.
+    /// </summary>
+    public const string CardsMark = "cards.mark";
 
     /// <summary>Leaves a card choice.</summary>
     public const string CardsLeave = "cards.leave";

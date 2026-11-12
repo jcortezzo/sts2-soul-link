@@ -116,6 +116,38 @@ public abstract class SyncTable : ISyncTable
         return CommitCodec.Encode(decision.Commits.Skip(before), format).ToList();
     }
 
+    /// <summary>
+    /// A player's selection so far on a "choose N" screen: the host checks the cards or options are on the player's
+    /// screen, and every peer records it the same way. It never commits anything.
+    /// </summary>
+    /// <param name="decision">The decision.</param>
+    /// <param name="op">The operation.</param>
+    /// <param name="selected">What the player has selected, possibly nothing.</param>
+    /// <param name="replay">The host's result on a client, or null on the host.</param>
+    /// <param name="isOnScreen">Whether the player has this card or option. Only called for participants.</param>
+    protected static IReadOnlyList<string> Marked<TAtom>(
+        LinkedChoice<TAtom> decision, SyncOp op, IReadOnlyList<TAtom> selected, IReadOnlyList<string>? replay, Func<TAtom, bool> isOnScreen)
+        where TAtom : notnull
+    {
+        ArgumentNullException.ThrowIfNull(decision);
+        ArgumentNullException.ThrowIfNull(selected);
+        if (replay is null)
+        {
+            if (!decision.IsParticipant(op.Player))
+            {
+                throw new SyncRejectedException(CommitCheck.NotParticipant.ToString());
+            }
+
+            if (selected.Count > decision.PickCount || selected.Distinct().Count() != selected.Count || !selected.All(isOnScreen))
+            {
+                throw new SyncRejectedException("That selection isn't on the player's screen.");
+            }
+        }
+
+        decision.Mark(op.Player, selected);
+        return replay ?? [];
+    }
+
     internal static string FormatKey(OptionKey key) => key.Value;
 
     internal static OptionKey ParseKey(string text) =>
@@ -199,6 +231,13 @@ public sealed class OptionTable : SyncTable
                 return Settled(Decision, replay, FormatKey, ParseKey, () => Decision.UpdateOptions(op.Player, updated));
             case SyncActions.OptionsChoose:
                 return ChooseOrApply(Decision, op, new Selection<OptionKey>(args.Rest().Select(ParseKey)), replay, FormatKey, ParseKey);
+            case SyncActions.OptionsMark:
+                return Marked(
+                    Decision,
+                    op,
+                    args.Rest().Select(ParseKey).ToList(),
+                    replay,
+                    key => Decision.OptionsOf(op.Player).Any(option => option.Key == key));
             case SyncActions.OptionsLeave:
                 args.End();
                 return Settled(Decision, replay, FormatKey, ParseKey, () => Decision.RemoveParticipant(op.Player));
@@ -251,6 +290,8 @@ public sealed class CardTable : SyncTable
                 return Settled(Decision, replay, FormatCard, ParseCard, () => Decision.Join(screen));
             case SyncActions.CardsChoose:
                 return ChooseOrApply(Decision, op, ReadCards(args), replay, FormatCard, ParseCard);
+            case SyncActions.CardsMark:
+                return Marked(Decision, op, args.Rest().Select(ParseCard).ToList(), replay, card => Decision.ScreenOf(op.Player).Contains(card));
             case SyncActions.CardsLeave:
                 args.End();
                 return Settled(Decision, replay, FormatCard, ParseCard, () => Decision.RemoveParticipant(op.Player));

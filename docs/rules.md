@@ -82,7 +82,9 @@ When several players choose a card from their deck for the same action, the firs
 
 The players in the action are the ones doing that same action at that moment: everyone who Smiths at a campfire, everyone who bought card removal, everyone who took the same event option. For multi-card picks (choose 2), the whole set must match.
 
-You pick on the game's own card screen as usual. With everyone agrees, confirming your pick is your vote: you're taken back to the cards, with your portrait on the one you picked and your teammates' portraits on theirs, and the screen stays open until everyone's picks agree, so you can still change it. With first click, the first confirmed pick decides. Confirming waits a few seconds for teammates whose screens haven't opened yet. A teammate whose screen opens after a pick was made follows it: with first click their matching card is picked for them, and with everyone agrees their matching card is the one they can confirm. Cards offered on the spot rather than from your deck, like Room Full of Cheese's commons, match by slot instead.
+You pick on the game's own card screen as usual. With everyone agrees, confirming your pick is your vote: you're taken back to the cards, with your portrait on the one you picked and your teammates' portraits on theirs, and the screen stays open until everyone's picks agree, so you can still change it. With first click, the first confirmed pick decides.
+
+On screens where you pick several cards, like Yummy Cookie's four upgrades, your teammates see each card as you select it, before you confirm: a faded portrait means selected, a solid one confirmed. Confirming or cancelling the preview keeps your selection on the screen. Click a selected card to unselect it; that takes back your confirm, so the pick only goes through once everyone has confirmed matching cards again. Once you've selected the full number, unselect one before selecting another. Confirming waits a few seconds for teammates whose screens haven't opened yet. A teammate whose screen opens after a pick was made follows it: with first click their matching card is picked for them, and with everyone agrees their matching card is the one they can confirm. Cards offered on the spot rather than from your deck, like Room Full of Cheese's commons, match by slot instead.
 
 ### Linked cards
 
@@ -169,7 +171,7 @@ The mod shows what's linked before anyone clicks, so nobody has to count slots o
 
 - **Slot peek:** hover a slot to see what each teammate has in it, headed with their name and portrait. On card rewards and cards offered on the spot it's their card in the same slot; on deck card screens it's the card they would pick from their deck; in the shop it's their item and what it costs them; at Ancients and events it's their option, when it differs from yours or they can't take it.
 - **Lock indicator:** after someone commits, their portrait sits on your matching option. Options you can't take are dimmed.
-- **Votes:** each option shows the character portraits of the players who clicked it, like the game's own group votes, on cards, relics and event options alike. With everyone agrees you can see what everyone is waiting for.
+- **Votes:** each option shows the character portraits of the players who clicked it, like the game's own group votes, on cards, relics and event options alike. With everyone agrees you can see what everyone is waiting for. On screens where you pick several cards, a faded portrait is a card someone has selected but not confirmed yet.
 - **Free indicator:** in nice mode, shows when you're not bound and why.
 - **Linked-card view:** with linked cards, cards carry a link badge. Hover one to see its linked cards in every deck, and selection screens highlight your matching card.
 - **Index view:** with deck index, selection screens number the cards.

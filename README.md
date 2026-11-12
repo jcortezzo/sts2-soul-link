@@ -14,7 +14,7 @@ It's inspired by Pokémon Soul Link challenges and the [Slay the Soul-Link](http
 The full rules, settings and worked examples are in [docs/rules.md](docs/rules.md). In short:
 
 - **Linked:** card rewards, deck card choices (upgrade, remove, transform, enchant, duplicate), shop purchases, campfires, events, Ancients and relic rewards. Treasure chests stay as in the base game.
-- **Who decides:** with everyone agrees (the default), a click is a vote and a choice is made once everyone who can make it has clicked it. With first click, the first click makes the choice for everyone at once.
+- **Who decides:** with everyone agrees (the default), a click is a vote and a choice is made once everyone who can make it has clicked it. With first click, the first click makes the choice for everyone at once. On screens where you pick several cards, teammates see your selection as you make it, and you can unselect cards after confirming.
 - **Nice or mean:** when a choice isn't possible for everyone, nice mode lets whoever can follow it, and mean mode greys it out for everyone.
 - **Card matching:** your "same card" is the card at the same position on your card screen by default, or the card linked to theirs (gained from the same choice).
 - **Shared death:** optional. When on, any player's death ends the run.

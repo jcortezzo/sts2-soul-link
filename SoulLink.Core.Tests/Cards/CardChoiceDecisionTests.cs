@@ -144,4 +144,74 @@ public class CardChoiceDecisionTests
         byIndex.Join(Screen(Ben, 10));
         Assert.Equal(Selection.Of(Card(Ben, 10)), byIndex.MatchFor(Ana, Selection.Of(Card(Ana, 12)), Ben));
     }
+
+    [Fact]
+    public void Selections_before_confirming_show_to_teammates_as_a_pick_would_match()
+    {
+        var decision = new CardChoiceDecision(new DeckIndexMatching(), LinkMode.Nice, pickCount: 2);
+        decision.Join(Screen(Ana, 6));
+        decision.Join(Screen(Ben, 4));
+
+        decision.Mark(Ana, [Card(Ana, 2), Card(Ana, 6)]);
+        decision.Mark(Ben, [Card(Ben, 4)]);
+
+        // Ana's sixth card is past the end of Ben's screen, so it shows on his last card, as her pick would.
+        Assert.Equal([Ana], decision.MarkersFor(Ben, Card(Ben, 2)));
+        Assert.Equal([Ana], decision.MarkersFor(Ben, Card(Ben, 4)));
+        Assert.Empty(decision.MarkersFor(Ben, Card(Ben, 1)));
+        Assert.Equal([Ben], decision.MarkersFor(Ana, Card(Ana, 4)));
+        Assert.Empty(decision.MarkersFor(Ana, Card(Ana, 6)));
+        Assert.Equal([Card(Ben, 4)], decision.MarksOf(Ben));
+    }
+
+    [Fact]
+    public void Selections_never_decide_even_when_they_line_up()
+    {
+        var decision = new CardChoiceDecision(new DeckIndexMatching(), LinkMode.Nice, pickCount: 2);
+        decision.Join(Screen(Ana, 5));
+        decision.Join(Screen(Ben, 5));
+
+        decision.Mark(Ana, [Card(Ana, 1), Card(Ana, 2)]);
+        decision.Mark(Ben, [Card(Ben, 1), Card(Ben, 2)]);
+
+        Assert.Empty(decision.Settle());
+        Assert.Empty(decision.Commits);
+    }
+
+    [Fact]
+    public void Changing_the_selection_after_confirming_takes_the_vote_back()
+    {
+        var decision = new CardChoiceDecision(new DeckIndexMatching(), LinkMode.Nice, pickCount: 2);
+        decision.Join(Screen(Ana, 5));
+        decision.Join(Screen(Ben, 5));
+        var anas = Selection.Of(Card(Ana, 1), Card(Ana, 2));
+
+        decision.Mark(Ana, anas.Items);
+        decision.Choose(Ana, anas);
+        decision.Mark(Ana, [Card(Ana, 2), Card(Ana, 1)]);
+        Assert.Equal(anas, decision.VoteOf(Ana));
+
+        decision.Mark(Ana, [Card(Ana, 1)]);
+        Assert.Null(decision.VoteOf(Ana));
+
+        // Ben confirming what Ana had decides nothing until she confirms it again.
+        Assert.Empty(decision.Choose(Ben, Selection.Of(Card(Ben, 1), Card(Ben, 2))));
+        decision.Mark(Ana, anas.Items);
+        Assert.Equal([Ben, Ana], decision.Choose(Ana, anas).Select(commit => commit.Player));
+        Assert.Empty(decision.MarksOf(Ana));
+    }
+
+    [Fact]
+    public void Clearing_the_selection_takes_the_vote_back()
+    {
+        var decision = new CardChoiceDecision(new DeckIndexMatching(), LinkMode.Nice, pickCount: 2);
+        decision.Join(Screen(Ana, 5));
+        decision.Join(Screen(Ben, 5));
+        decision.Choose(Ana, Selection.Of(Card(Ana, 1), Card(Ana, 2)));
+
+        decision.Mark(Ana, []);
+
+        Assert.Null(decision.VoteOf(Ana));
+        Assert.Empty(decision.MarkersFor(Ben, Card(Ben, 1)));
+    }
 }

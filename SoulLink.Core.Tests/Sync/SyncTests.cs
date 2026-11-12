@@ -527,4 +527,65 @@ public class SyncTests
         Assert.Equal(Selection.Of(Card(Ana, 3)), network.Agreed(state => state.Find<CardTable>(screen)!.Decision.CommitOf(Ana)?.Choice));
         Assert.Equal(Selection.Of(Card(Ben, 4)), network.Agreed(state => state.Find<CardTable>(screen)!.Decision.CommitOf(Ben)?.Choice));
     }
+
+    [Fact]
+    public void Selections_on_a_choose_n_screen_show_on_every_peer_until_everyone_lines_up()
+    {
+        // Yummy Cookie: both players upgrade two cards, and see each other's selections before confirming.
+        var network = new SyncTestNetwork();
+        const string cookie = "f2/event/1|slot:1/cards-1";
+        network.Send(cookie, Ana, SyncActions.CardsJoin, CardTable.JoinArgs(2, Screen(Ana, 5).Cards));
+        network.Send(cookie, Ben, SyncActions.CardsJoin, CardTable.JoinArgs(2, Screen(Ben, 5).Cards));
+        static CardChoiceDecision Decision(SyncState state) => state.Find<CardTable>(cookie)!.Decision;
+        static string Id(PlayerId owner, int number) => SyncArgs.Number(Card(owner, number).Value);
+
+        network.Send(cookie, Ana, SyncActions.CardsMark, Id(Ana, 1));
+        Assert.Equal([Ana], network.Agreed(state => Decision(state).MarkersFor(Ben, Card(Ben, 1)).ToList()));
+
+        network.Send(cookie, Ana, SyncActions.CardsMark, Id(Ana, 1), Id(Ana, 2));
+        network.Send(cookie, Ana, SyncActions.CardsChoose, Id(Ana, 1), Id(Ana, 2));
+        network.Send(cookie, Ben, SyncActions.CardsMark, Id(Ben, 1), Id(Ben, 3));
+        network.Send(cookie, Ben, SyncActions.CardsChoose, Id(Ben, 1), Id(Ben, 3));
+        Assert.Equal([Ben], network.Agreed(state => Decision(state).MarkersFor(Ana, Card(Ana, 3)).ToList()));
+        Assert.Empty(network.Agreed(state => Decision(state).Commits.ToList()));
+
+        // Ben unselects his third card, which takes his confirm back everywhere, then lines up with Ana.
+        network.Send(cookie, Ben, SyncActions.CardsMark, Id(Ben, 1));
+        Assert.Null(network.Agreed(state => Decision(state).VoteOf(Ben)));
+        network.Send(cookie, Ben, SyncActions.CardsMark, Id(Ben, 1), Id(Ben, 2));
+        Assert.Empty(network.Agreed(state => Decision(state).Commits.ToList()));
+        network.Send(cookie, Ben, SyncActions.CardsChoose, Id(Ben, 1), Id(Ben, 2));
+
+        Assert.Equal(Selection.Of(Card(Ana, 1), Card(Ana, 2)), network.Agreed(state => Decision(state).CommitOf(Ana)?.Choice));
+        Assert.Equal(Selection.Of(Card(Ben, 1), Card(Ben, 2)), network.Agreed(state => Decision(state).CommitOf(Ben)?.Choice));
+    }
+
+    [Fact]
+    public void Selections_must_be_on_the_players_own_screen()
+    {
+        var network = new SyncTestNetwork();
+        const string cookie = "f2/event/1|slot:1/cards-1";
+        network.Send(cookie, Ana, SyncActions.CardsJoin, CardTable.JoinArgs(2, Screen(Ana, 5).Cards));
+        static string Id(PlayerId owner, int number) => SyncArgs.Number(Card(owner, number).Value);
+
+        Assert.False(network.Send(cookie, Ben, SyncActions.CardsMark, Id(Ben, 1)).IsAccepted);
+        Assert.False(network.Send(cookie, Ana, SyncActions.CardsMark, Id(Ben, 1)).IsAccepted);
+        Assert.False(network.Send(cookie, Ana, SyncActions.CardsMark, Id(Ana, 1), Id(Ana, 1)).IsAccepted);
+        Assert.False(network.Send(cookie, Ana, SyncActions.CardsMark, Id(Ana, 1), Id(Ana, 2), Id(Ana, 3)).IsAccepted);
+        Assert.True(network.Send(cookie, Ana, SyncActions.CardsMark).IsAccepted);
+    }
+
+    [Fact]
+    public void Selections_of_offered_cards_show_by_slot()
+    {
+        var network = new SyncTestNetwork();
+        const string offered = "f2/event/1|slot:2/cards-1";
+        network.Send(offered, Ana, SyncActions.OptionsJoin, OptionTable.JoinArgs(2, Slots(4)));
+        network.Send(offered, Ben, SyncActions.OptionsJoin, OptionTable.JoinArgs(2, Slots(4)));
+
+        network.Send(offered, Ana, SyncActions.OptionsMark, Slot(1).Value, Slot(4).Value);
+
+        Assert.Equal([Ana], network.Agreed(state => state.Find<OptionTable>(offered)!.Decision.MarkersFor(Ben, Slot(4)).ToList()));
+        Assert.False(network.Send(offered, Ana, SyncActions.OptionsMark, Slot(5).Value).IsAccepted);
+    }
 }
