@@ -63,12 +63,14 @@ dotnet test tests/SoulLink.Core.Tests/SoulLink.Core.Tests.csproj
 
 The rules engine tests don't need the game, and CI runs them on every push. The mod project isn't built in CI because it needs the game's DLLs.
 
-To test co-op on one PC, start several clients with the community-documented `--fastmp` launch flags, run from the game folder:
+To try co-op on one PC, build the mod (Rider's Build button runs the same target as `dotnet build`), put a `steam_appid.txt` file containing `2868840` in the game folder so the game can start outside Steam, and start a host and a client from that folder:
 
 ```bat
-start "" SlayTheSpire2.exe --fastmp=host -wpos 0 0
-start "" SlayTheSpire2.exe --fastmp=join --clientId=1001 -wpos 960 0
+start "" SlayTheSpire2.exe -fastmp host_standard -wpos 0 0
+start "" SlayTheSpire2.exe -fastmp join -wpos 960 0
 ```
+
+The host opens a standard co-op lobby and the client joins it after a moment; more clients need `-clientId 1001`, `1002` and so on. To watch the mod's log lines live, turn on "Open log window on startup" under Mod Configuration → BaseLib; the log is also saved in `%AppData%\SlayTheSpire2\logs\godot.log`.
 
 ## Contributing
 
