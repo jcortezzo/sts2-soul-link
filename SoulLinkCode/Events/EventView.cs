@@ -14,10 +14,6 @@ namespace SoulLink.SoulLinkCode.Events;
 /// </summary>
 internal static class EventView
 {
-    private const string DimmedMeta = "soul_link_dimmed";
-
-    private static readonly Color Dimmed = new(1f, 1f, 1f, 0.35f);
-
     private static readonly AccessTools.FieldRef<NEventOptionButton, Tween?> AnimInTweenField =
         AccessTools.FieldRefAccess<NEventOptionButton, Tween?>("_animInTween");
 
@@ -40,7 +36,7 @@ internal static class EventView
                 continue;
             }
 
-            SetDimmed(button, page is { } linked && IsBlocked(linked, button));
+            Dim.Set(button, page is { } linked && IsBlocked(linked, button));
             button.RefreshVotes();
         }
 
@@ -100,19 +96,6 @@ internal static class EventView
             && view.State is OptionState.Locked or OptionState.GreyedOut or OptionState.NotChosen;
     }
 
-    private static void SetDimmed(NEventOptionButton button, bool dimmed)
-    {
-        if (dimmed)
-        {
-            button.Modulate = Dimmed;
-            button.SetMeta(DimmedMeta, true);
-        }
-        else if (button.HasMeta(DimmedMeta))
-        {
-            button.Modulate = Colors.White;
-            button.RemoveMeta(DimmedMeta);
-        }
-    }
 
     /// <summary>What each linked player has picked so far, like "You: want option 2     Ben: chose option 2".</summary>
     private static string Status(LinkedPage page)

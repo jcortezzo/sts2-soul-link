@@ -1,3 +1,4 @@
+using System.Reflection;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -46,10 +47,7 @@ internal static class CardIdPatches
     }
 }
 
-/// <summary>
-/// Links card screens that follow a linked choice: notes when the game starts waiting for one, and takes the pick
-/// out of the screen as it would finish, keeping the screen open until the host commits the local player's cards.
-/// </summary>
+/// <summary>Notes when the game starts waiting for a card screen, and keeps a linked screen open while its pick is out.</summary>
 [HarmonyPatch]
 internal static class CardScreenPatches
 {
@@ -57,11 +55,28 @@ internal static class CardScreenPatches
     [HarmonyPostfix]
     private static void Opened(NCardGridSelectionScreen __instance) => Views.Refresh("card choice", () => DeckChoices.Opened(__instance));
 
-    [HarmonyPatch(typeof(NDeckUpgradeSelectScreen), "CheckIfSelectionComplete")]
-    [HarmonyPatch(typeof(NDeckCardSelectScreen), "CheckIfSelectionComplete")]
-    [HarmonyPatch(typeof(NDeckEnchantSelectScreen), "CheckIfSelectionComplete")]
-    [HarmonyPatch(typeof(NSimpleCardSelectScreen), "CompleteSelection")]
-    [HarmonyPatch(typeof(NDeckTransformSelectScreen), "CompleteSelection")]
+    [HarmonyPatch(typeof(NOverlayStack), nameof(NOverlayStack.Remove))]
+    [HarmonyPrefix]
+    private static bool KeepLinkedScreenOpen(IOverlayScreen screen) => !ReferenceEquals(screen, DeckChoices.KeepOpen);
+}
+
+/// <summary>
+/// Takes the pick out of a linked card screen as it would finish: the screen finishes into a stand-in, so the pick can
+/// be read without the game acting on it, and stays open until the host commits the local player's cards.
+/// </summary>
+[HarmonyPatch]
+internal static class CardScreenFinishPatches
+{
+    /// <summary>Where each card screen finishes with the player's pick.</summary>
+    private static IEnumerable<MethodBase> TargetMethods() =>
+    [
+        AccessTools.Method(typeof(NDeckUpgradeSelectScreen), "CheckIfSelectionComplete"),
+        AccessTools.Method(typeof(NDeckCardSelectScreen), "CheckIfSelectionComplete"),
+        AccessTools.Method(typeof(NDeckEnchantSelectScreen), "CheckIfSelectionComplete"),
+        AccessTools.Method(typeof(NSimpleCardSelectScreen), "CompleteSelection"),
+        AccessTools.Method(typeof(NDeckTransformSelectScreen), "CompleteSelection"),
+    ];
+
     [HarmonyPrefix]
     private static void BeforeFinish(NCardGridSelectionScreen __instance, out TaskCompletionSource<IEnumerable<CardModel>>? __state)
     {
@@ -71,17 +86,11 @@ internal static class CardScreenPatches
             return;
         }
 
-        // The screen finishes into a stand-in, so the pick can be read without the game acting on it.
         __state = CardScreenAccess.Completion(__instance);
         CardScreenAccess.Completion(__instance) = new TaskCompletionSource<IEnumerable<CardModel>>();
         DeckChoices.KeepOpen = __instance;
     }
 
-    [HarmonyPatch(typeof(NDeckUpgradeSelectScreen), "CheckIfSelectionComplete")]
-    [HarmonyPatch(typeof(NDeckCardSelectScreen), "CheckIfSelectionComplete")]
-    [HarmonyPatch(typeof(NDeckEnchantSelectScreen), "CheckIfSelectionComplete")]
-    [HarmonyPatch(typeof(NSimpleCardSelectScreen), "CompleteSelection")]
-    [HarmonyPatch(typeof(NDeckTransformSelectScreen), "CompleteSelection")]
     [HarmonyPostfix]
     private static void AfterFinish(NCardGridSelectionScreen __instance, TaskCompletionSource<IEnumerable<CardModel>>? __state)
     {
@@ -99,10 +108,6 @@ internal static class CardScreenPatches
             Views.Refresh("card choice", () => DeckChoices.Picked(__instance, picked));
         }
     }
-
-    [HarmonyPatch(typeof(NOverlayStack), nameof(NOverlayStack.Remove))]
-    [HarmonyPrefix]
-    private static bool KeepLinkedScreenOpen(IOverlayScreen screen) => !ReferenceEquals(screen, DeckChoices.KeepOpen);
 }
 
 /// <summary>The card screen fields the patches swap.</summary>

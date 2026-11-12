@@ -14,7 +14,6 @@ namespace SoulLink.SoulLinkCode.Rewards;
 /// </summary>
 internal static class RelicRewardLinks
 {
-    private static readonly Color Dimmed = new(1f, 1f, 1f, 0.35f);
     private static readonly DecisionOption[] Options = [new(OptionKey.Take), new(OptionKey.Skip)];
     private static readonly HashSet<string> Done = new(StringComparer.Ordinal);
 
@@ -146,7 +145,7 @@ internal static class RelicRewardLinks
                 continue;
             }
 
-            button.Modulate = OptionLinks.IsBlocked(decision, OptionKey.Take) ? Dimmed : Colors.White;
+            Dim.Set(button, OptionLinks.IsBlocked(decision, OptionKey.Take));
             VoteIcons.Show(button, VoteIcons.BoundsOf(button, null), OptionLinks.Backers(decision, OptionKey.Take), VoteIcons.Placement.Right);
             if (decision.Participants.Count > 1)
             {

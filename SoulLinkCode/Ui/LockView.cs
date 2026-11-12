@@ -15,8 +15,6 @@ namespace SoulLink.SoulLinkCode.Ui;
 /// </summary>
 internal static class LockView
 {
-    private static readonly Color Dimmed = new(1f, 1f, 1f, 0.35f);
-
     private static NCardRewardSelectionScreen? _cardRewardScreen;
 
     public static void Show(NCardRewardSelectionScreen screen)
@@ -55,7 +53,7 @@ internal static class LockView
             var key = CardRewardLinks.KeyOfCard(options, i);
             var blocked = views.TryGetValue(key, out var view)
                 && view.State is OptionState.Locked or OptionState.GreyedOut or OptionState.Unavailable or OptionState.NotChosen;
-            holder.Modulate = blocked ? Dimmed : Colors.White;
+            Dim.Set(holder, blocked);
             VoteIcons.Show(holder, VoteIcons.BoundsOf(holder, holder.Hitbox), OptionLinks.Backers(decision, key));
         }
 

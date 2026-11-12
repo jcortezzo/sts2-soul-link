@@ -33,8 +33,6 @@ internal static class DeckChoices
     /// <summary>How long a pick waits for teammates' screens to open before it's sent anyway.</summary>
     private const ulong HoldLimitMsec = 8000;
 
-    private static readonly Color Dimmed = new(1f, 1f, 1f, 0.35f);
-
     private static readonly AccessTools.FieldRef<NCardGridSelectionScreen, IReadOnlyList<CardModel>?> CardsField =
         AccessTools.FieldRefAccess<NCardGridSelectionScreen, IReadOnlyList<CardModel>?>("_cards");
 
@@ -174,7 +172,7 @@ internal static class DeckChoices
             }
 
             var view = decision?.Views.FirstOrDefault(entry => entry.Card == card);
-            holder.Modulate = view?.State is OptionState.Locked or OptionState.GreyedOut or OptionState.NotChosen ? Dimmed : Colors.White;
+            Dim.Set(holder, view?.State is OptionState.Locked or OptionState.GreyedOut or OptionState.NotChosen);
             var backers = new List<PlayerId>();
             if (open.Held?.Cards.Contains(card) == true)
             {
@@ -290,6 +288,11 @@ internal static class DeckChoices
         }
 
         CompletionField(screen)?.TrySetResult(cards);
+        if (ReferenceEquals(KeepOpen, screen))
+        {
+            KeepOpen = null;
+        }
+
         if (screen.IsInsideTree())
         {
             NOverlayStack.Instance?.Remove(screen);

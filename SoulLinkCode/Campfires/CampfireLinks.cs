@@ -22,8 +22,6 @@ namespace SoulLink.SoulLinkCode.Campfires;
 /// </summary>
 internal static class CampfireLinks
 {
-    private static readonly Color Dimmed = new(1f, 1f, 1f, 0.35f);
-
     private static readonly MethodInfo SelectOptionMethod =
         AccessTools.Method(typeof(NRestSiteButton), "SelectOption", [typeof(RestSiteOption)]);
 
@@ -131,7 +129,7 @@ internal static class CampfireLinks
 
             var blocked = views.TryGetValue(option.OptionId, out var view)
                 && view.State is OptionState.Locked or OptionState.GreyedOut or OptionState.NotChosen;
-            button.Modulate = blocked ? Dimmed : Colors.White;
+            Dim.Set(button, blocked);
             var backers = campfire.Campers.Where(player => Picked(campfire, player, option.OptionId)).ToList();
             VoteIcons.Show(button, VoteIcons.BoundsOf(button, null), backers);
         }

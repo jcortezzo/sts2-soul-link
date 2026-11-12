@@ -20,10 +20,6 @@ namespace SoulLink.SoulLinkCode.Shops;
 /// </summary>
 internal static class ShopLinks
 {
-    private const string DimmedMeta = "soul_link_dimmed";
-
-    private static readonly Color Dimmed = new(1f, 1f, 1f, 0.35f);
-
     /// <summary>Purchases done in the game, as "table|sequence", so each linked purchase is made once.</summary>
     private static readonly HashSet<string> Done = new(StringComparer.Ordinal);
 
@@ -195,7 +191,7 @@ internal static class ShopLinks
                 continue;
             }
 
-            SetDimmed(node, shop.CanBuy(session.Me, slot).Verdict == PurchaseVerdict.GreyedOut);
+            Dim.Set(node, shop.CanBuy(session.Me, slot).Verdict == PurchaseVerdict.GreyedOut);
             var backers = shop.Shoppers
                 .Where(player => shop.VotersFor(slot).Contains(player) || shop.Purchases.Any(purchase => purchase.Player == player && purchase.Slot == slot))
                 .ToList();
@@ -230,19 +226,6 @@ internal static class ShopLinks
         return shop.Purchases.LastOrDefault(purchase => purchase.Player == player) is { } last ? $"bought {last.Slot}" : "browsing";
     }
 
-    private static void SetDimmed(Control node, bool dimmed)
-    {
-        if (dimmed)
-        {
-            node.Modulate = Dimmed;
-            node.SetMeta(DimmedMeta, true);
-        }
-        else if (node.HasMeta(DimmedMeta))
-        {
-            node.Modulate = Colors.White;
-            node.RemoveMeta(DimmedMeta);
-        }
-    }
 
     private static SoulLink.Core.Decisions.CommitCheck? ToCommitCheck(PurchaseCheck check) =>
         check.Verdict switch
