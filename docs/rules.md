@@ -114,7 +114,7 @@ Each shop slot is its own linked decision: every card, relic and potion, plus th
 - **Mean:** a slot can only be bought if every player can buy theirs at that moment; otherwise it's greyed out for everyone.
 - **Everyone agrees:** a slot is bought once everyone who can buy it has clicked it, for all of them at once. You can click several slots; a click you can no longer pay for is dropped, and clicks nobody agreed to end when the party leaves.
 - **First click:** buying a slot buys it at once for everyone else who can.
-- **Can't buy** means not enough gold, sold out, no free potion slot, or removal already used in this shop.
+- **Can't buy** means not enough gold, sold out, no free potion slot, or removal already used in this shop. Slots you can't buy are dimmed.
 - **Card removal:** the removal buyers' chosen cards are a linked deck card action (see Deck card actions).
 - **Not buying** binds no one: nobody has to buy something because someone else didn't.
 - **Potions** bought here follow these rules, even though potions are otherwise free.

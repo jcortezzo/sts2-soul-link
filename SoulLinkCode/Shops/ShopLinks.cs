@@ -239,7 +239,7 @@ internal static class ShopLinks
         Callable.From(Run).CallDeferred();
     }
 
-    /// <summary>Shows who wants or bought each slot, and dims slots mean mode greys out.</summary>
+    /// <summary>Shows who wants or bought each slot, and dims the slots the local player can't buy right now.</summary>
     public static void Refresh()
     {
         if (Room()?.Inventory is not { } rug || !GodotObject.IsInstanceValid(rug))
@@ -259,7 +259,10 @@ internal static class ShopLinks
                 continue;
             }
 
-            Dim.Set(node, shop.CanBuy(session.Me, slot).Verdict == PurchaseVerdict.GreyedOut);
+            // The game only turns an unaffordable price red. Dimmed: mean mode's greyed-out slots, and slots the player
+            // can't pay for or has no potion slot for, counting gold and slots set aside for purchases they owe.
+            var verdict = shop.CanBuy(session.Me, slot).Verdict;
+            Dim.Set(node, !entry.EnoughGold || verdict is PurchaseVerdict.GreyedOut or PurchaseVerdict.NotEnoughGold or PurchaseVerdict.NoPotionSlot);
             var backers = shop.Shoppers
                 .Where(player => shop.VotersFor(slot).Contains(player) || shop.Purchases.Any(purchase => purchase.Player == player && purchase.Slot == slot))
                 .ToList();
