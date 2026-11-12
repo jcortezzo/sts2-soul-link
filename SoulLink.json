@@ -1,14 +1,17 @@
 {
   "id": "SoulLink",
   "name": "Soul Link",
-  "author": "jcortezzo",
+  "author": "OGSuperSand",
   "description": "Links every out-of-combat decision between co-op players: everyone who can make the same choice makes it together, once everyone agrees or on the first click.",
   "version": "v0.0.0",
-  "min_game_version": "0.107.0",
-  "has_pck": false,
+  "min_game_version": "0.107.1",
+  "has_pck": true,
   "has_dll": true,
   "dependencies": [
-    {"id": "BaseLib", "min_version": "3.3.0"}
+    {
+      "id": "BaseLib",
+      "min_version": "3.4.7"
+    }
   ],
   "affects_gameplay": true
 }

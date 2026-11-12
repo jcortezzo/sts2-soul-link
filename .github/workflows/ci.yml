@@ -17,13 +17,13 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
-      # Only the rules engine and its tests build in CI. The mod project (src/SoulLink)
+      # Only the rules engine and its tests build in CI. The mod project (SoulLink.csproj)
       # compiles against the game's own DLLs, which can't be redistributed.
       - name: Restore
-        run: dotnet restore tests/SoulLink.Core.Tests/SoulLink.Core.Tests.csproj
+        run: dotnet restore SoulLink.Core.Tests/SoulLink.Core.Tests.csproj
 
       - name: Build
-        run: dotnet build tests/SoulLink.Core.Tests/SoulLink.Core.Tests.csproj --configuration Release --no-restore
+        run: dotnet build SoulLink.Core.Tests/SoulLink.Core.Tests.csproj --configuration Release --no-restore
 
       - name: Test
-        run: dotnet test tests/SoulLink.Core.Tests/SoulLink.Core.Tests.csproj --configuration Release --no-build --verbosity normal
+        run: dotnet test SoulLink.Core.Tests/SoulLink.Core.Tests.csproj --configuration Release --no-build --verbosity normal

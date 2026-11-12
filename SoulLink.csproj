@@ -36,10 +36,10 @@
 
     <ItemGroup>
         <PackageReference Include="Alchyr.Sts2.BaseLib" Version="*" PrivateAssets="All"/>
-        <!-- <PackageReference Include="Alchyr.Sts2.ModAnalyzers" Version="*" /> Some checks regarding models and localization. Uncomment to enable. -->
+        <PackageReference Include="Alchyr.Sts2.ModAnalyzers" Version="*" />
         <!-- Generates a .pck file when building if only using simple assets. May not work on all setups. Uncomment to test. -->
-        <!-- <PackageReference Include="BSchneppe.StS2.PckPacker" Version="0.1.1" PrivateAssets="All" /> -->
-        <AdditionalFiles Include="SoulLink/localization/**/*.json"/> <!-- Used by analyzer, if it's enabled -->
+        <PackageReference Include="BSchneppe.StS2.PckPacker" Version="0.1.1" PrivateAssets="All" />
+        <AdditionalFiles Include="SoulLink/localization/**/*.json"/> <!-- Used by analyzer -->
     </ItemGroup>
 
     <ItemGroup>
@@ -53,16 +53,15 @@
         <EmbeddedResource Remove="images/**" />
     </ItemGroup>
 
-    <!-- The rules engine is compiled into this assembly so the mod ships as a single DLL. -->
+    <!-- The rules engine in SoulLink.Core is compiled into this DLL from its folder; its tests are a separate project. -->
     <ItemGroup>
-        <Compile Include="../SoulLink.Core/**/*.cs"
-                 Exclude="../SoulLink.Core/bin/**;../SoulLink.Core/obj/**"
-                 Link="Core/%(RecursiveDir)%(Filename)%(Extension)" />
+        <Compile Remove="SoulLink.Core/bin/**;SoulLink.Core/obj/**;SoulLink.Core.Tests/**" />
+        <None Remove="SoulLink.Core/bin/**;SoulLink.Core/obj/**;SoulLink.Core.Tests/**" />
     </ItemGroup>
 
     <ItemGroup>
         <None Condition="Exists('Directory.Build.props')" Include="Directory.Build.props"/>
-        <None Include="Directory.Build.props.example" />
+        <None Include=".gitignore" />
         <None Include="SoulLink.json" />
         <None Include="project.godot"/>
         <None Include="SoulLink/**" />

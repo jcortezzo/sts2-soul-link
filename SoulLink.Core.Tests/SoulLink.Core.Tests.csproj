@@ -22,7 +22,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\SoulLink.Core\SoulLink.Core.csproj" />
+        <ProjectReference Include="..\SoulLink.Core\SoulLink.Core.csproj" />
     </ItemGroup>
 
 </Project>

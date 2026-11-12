@@ -4,9 +4,10 @@ using SoulLink.Core;
 namespace SoulLink.SoulLinkCode;
 
 /// <summary>
-/// The Soul Link rules in BaseLib's mod config menu. Only the host's values matter: the host sends them to everyone
-/// when a run starts.
+/// The Soul Link rules in BaseLib's mod config menu, with names and hover text from SoulLink/localization. Only the
+/// host's values matter: the host sends them to everyone when a run starts.
 /// </summary>
+[ConfigHoverTipsByDefault]
 internal sealed class SoulLinkConfig : SimpleModConfig
 {
     /// <summary>Which of your cards counts as "the same card" for upgrades, removals and other deck choices.</summary>
