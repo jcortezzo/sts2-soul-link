@@ -124,13 +124,7 @@ internal sealed class SoulLinkSession
 
     internal static void ReceiveRejection(SyncRejection rejection) => Deliver(session => session.OnRejection(rejection));
 
-    /// <summary>
-    /// Host detection by name, so a renamed or reordered enum in a game update fails loudly in the log rather than
-    /// at compile time.
-    /// </summary>
-    private static bool IsHostService(INetGameService net) =>
-        string.Equals(net.Type.ToString(), "Host", StringComparison.Ordinal)
-        || net.GetType().Name.Contains("Host", StringComparison.Ordinal);
+    private static bool IsHostService(INetGameService net) => net.Type == NetGameType.Host;
 
     private static void Deliver(Action<SoulLinkSession> action)
     {
