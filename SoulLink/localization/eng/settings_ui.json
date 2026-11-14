@@ -1,0 +1,17 @@
+{
+  "SOULLINK-RULES.title": "Rules",
+  "SOULLINK-DECK_CARD_MATCHING.title": "Card Matching",
+  "SOULLINK-DECK_CARD_MATCHING.hover.desc": "Which of your cards counts as the same card for upgrades, removals and other deck choices: the card at the same position, or the card linked to theirs. The host's setting applies to everyone.",
+  "SOULLINK-DECK_CARD_MATCHING.LinkedCards": "Linked Cards",
+  "SOULLINK-DECK_CARD_MATCHING.DeckIndex": "Deck Index",
+  "SOULLINK-MODE.title": "Mode",
+  "SOULLINK-MODE.hover.desc": "Nice: whoever can make the same choice has to. Mean: an option is greyed out unless everyone can take it. The host's setting applies to everyone.",
+  "SOULLINK-MODE.Nice": "Nice",
+  "SOULLINK-MODE.Mean": "Mean",
+  "SOULLINK-SHARED_DEATH.title": "Shared Death",
+  "SOULLINK-SHARED_DEATH.hover.desc": "Ends the run for everyone when any player dies. The host's setting applies to everyone.",
+  "SOULLINK-WHO_DECIDES.title": "Who Decides",
+  "SOULLINK-WHO_DECIDES.hover.desc": "Everyone Agrees: a choice is made once everyone who can make it has clicked it. First Click: the first click makes it for everyone. The host's setting applies to everyone.",
+  "SOULLINK-WHO_DECIDES.EveryoneAgrees": "Everyone Agrees",
+  "SOULLINK-WHO_DECIDES.FirstClick": "First Click"
+}

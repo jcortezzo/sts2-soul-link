@@ -1,22 +1,12 @@
-# Build output
+.godot/
 bin/
 obj/
-TestResults/
-
-# IDEs
-.vs/
+/android/
 .idea/
-*.user
-*.suo
-*.sln.DotSettings.user
-
-# Godot (only used when publishing assets into a .pck)
-.godot/
-.nomedia
-
-# Local build settings (copy Directory.Build.props.example to override paths)
-src/SoulLink/Directory.Build.props
-
-# C# project cache files
-src/SoulLink/Properties/
+.vs/
+publish/
+Properties/
 packages/
+TestResults/
+*.user
+Directory.Build.props

@@ -1,0 +1,268 @@
+using System.Runtime.CompilerServices;
+using MegaCrit.Sts2.Core.Context;
+using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.CardRewardAlternatives;
+using MegaCrit.Sts2.Core.Models.Relics;
+using MegaCrit.Sts2.Core.Rewards;
+using SoulLink.Core.Decisions;
+using SoulLink.Core.Rewards;
+using SoulLink.Core.Sync;
+using SoulLink.SoulLinkCode.Ui;
+
+namespace SoulLink.SoulLinkCode.Rewards;
+
+/// <summary>
+/// Maps the game's card rewards onto linked card reward screens: which table a reward belongs to, what it offers and
+/// which option key each card or button is.
+/// </summary>
+internal static class CardRewardLinks
+{
+    public const string RerollId = "REROLL";
+
+    /// <summary>Pael's Wing's button, which the relic always adds for its owner.</summary>
+    public const string SacrificeId = "SACRIFICE";
+
+    /// <summary>Lasting Candy's bonus card, the one extra card a relic adds to reward screens.</summary>
+    public const string LastingCandySource = "LASTING_CANDY";
+
+    private static readonly ConditionalWeakTable<CardCreationResult, string> ExtraSources = new();
+    private static readonly ConditionalWeakTable<RewardsSet, StrongBox<int>> SetNumbers = new();
+    private static readonly Dictionary<string, int> SetsPerLocation = new(StringComparer.Ordinal);
+    private static readonly HashSet<string> Joined = new(StringComparer.Ordinal);
+
+    /// <summary>The cards last shared for slot peek, by table, so an unchanged offer isn't sent again.</summary>
+    private static readonly Dictionary<string, string> Shared = new(StringComparer.Ordinal);
+
+    /// <summary>The local player's reward set on the rewards screen.</summary>
+    public static RewardsSet? CurrentSet { get; private set; }
+
+    /// <summary>The local player's open card reward.</summary>
+    public static CardReward? ActiveReward { get; private set; }
+
+    /// <summary>Forgets everything from the last run.</summary>
+    public static void Reset()
+    {
+        SetsPerLocation.Clear();
+        Joined.Clear();
+        Shared.Clear();
+        CurrentSet = null;
+        ActiveReward = null;
+    }
+
+    /// <summary>Marks a card a relic added to a reward screen, so it's linked as an extra rather than a slot.</summary>
+    public static void MarkExtra(CardCreationResult card, string source) => ExtraSources.AddOrUpdate(card, source);
+
+    /// <summary>
+    /// Numbers a reward set within its room, the same way on every peer, so the room's combat rewards are set 1 for
+    /// everyone.
+    /// </summary>
+    public static void ShowSet(RewardsSet set)
+    {
+        if (!LocalContext.IsMe(set.Player))
+        {
+            return;
+        }
+
+        CurrentSet = set;
+        if (!SetNumbers.TryGetValue(set, out _))
+        {
+            var location = LocationOf(set);
+            SetsPerLocation[location] = SetsPerLocation.GetValueOrDefault(location) + 1;
+            SetNumbers.Add(set, new StrongBox<int>(SetsPerLocation[location]));
+        }
+
+        // Join every card reward screen right away, so mean mode can check this player's cards before anyone picks.
+        foreach (var reward in set.Rewards.OfType<CardReward>().Where(reward => reward.IsPopulated))
+        {
+            Join(reward);
+        }
+
+        RelicRewardLinks.JoinAll(set);
+    }
+
+    /// <summary>Records the local player's open card reward and joins its linked screen.</summary>
+    public static void Open(CardReward reward)
+    {
+        if (!LocalContext.IsMe(reward.Player))
+        {
+            return;
+        }
+
+        ActiveReward = reward;
+        Join(reward);
+    }
+
+    /// <summary>The linked table for a card reward, or null when it isn't part of a known reward set.</summary>
+    public static string? TableId(CardReward reward) =>
+        CurrentSet is { } set && set.Rewards.Contains(reward) && SetPrefix(set) is { } prefix
+            ? $"{prefix}/card-{ScreenNumber(set, reward)}"
+            : null;
+
+    /// <summary>
+    /// The start of the table ids for a reward set's linked rewards: the room and the set's number in it, the same on
+    /// every peer. Null for a set that isn't the local player's current one.
+    /// </summary>
+    public static string? SetPrefix(RewardsSet set) =>
+        ReferenceEquals(set, CurrentSet) && SetNumbers.TryGetValue(set, out var number) ? $"{LocationOf(set)}/rewards-{number.Value}" : null;
+
+    /// <summary>
+    /// The join for the reward's linked screen, with what it offers: once when the screen opens, and again with a
+    /// click (<paramref name="again"/>) until this peer has seen the host accept it. The host ignores a repeat.
+    /// </summary>
+    public static IReadOnlyList<GatedOp> JoinOps(CardReward reward, bool again = false)
+    {
+        if (TableId(reward) is not { } table || (!again && Joined.Contains(table)) || CurrentSet is not { } set
+            || SoulLinkSession.Current is not { } session)
+        {
+            return [];
+        }
+
+        var args = RewardTable.JoinArgs(ScreenNumber(set, reward), OfferOf(reward));
+        return session.HasJoined(table, SyncActions.RewardJoin, args)
+            ? []
+            : [new GatedOp(table, SyncActions.RewardJoin, args, Sent: () => Joined.Add(table))];
+    }
+
+    /// <summary>The option key of the card at an index of the reward's options: a slot, or an extra from a relic.</summary>
+    public static OptionKey KeyOfCard(IReadOnlyList<CardCreationResult> options, int index)
+    {
+        if (ExtraSources.TryGetValue(options[index], out var source))
+        {
+            return CardRewardKeys.Extra(source);
+        }
+
+        var slot = 1;
+        for (var i = 0; i < index; i++)
+        {
+            slot += ExtraSources.TryGetValue(options[i], out _) ? 0 : 1;
+        }
+
+        return CardRewardKeys.Card(slot);
+    }
+
+    /// <summary>
+    /// The option key of a button below the cards, or null for a reroll, which isn't a commit. Pael's Wing's sacrifice
+    /// is linked only among holders; Skip and any button another mod adds count as skipping.
+    /// </summary>
+    public static OptionKey? KeyOfAlternative(CardRewardAlternative alternative) => alternative.OptionId switch
+    {
+        RerollId => null,
+        SacrificeId => CardRewardKeys.Sacrifice,
+        _ => CardRewardKeys.Skip,
+    };
+
+    /// <summary>The operation for a click on a key on the reward's screen, checked against the local linked state.</summary>
+    public static GatedOp Choose(string table, OptionKey key) =>
+        new(table, SyncActions.RewardChoose, [key.Value], state =>
+            state.Find<RewardTable>(table)?.Screen.CanCommit(Me(), key));
+
+    /// <summary>The local player's linked screen for a table, once they've joined it.</summary>
+    public static CardRewardScreen? ScreenOf(string table) =>
+        SoulLinkSession.Current is { } session
+        && session.State.Find<RewardTable>(table)?.Screen is { } screen
+        && screen.Decision.IsParticipant(session.Me)
+            ? screen
+            : null;
+
+    /// <summary>Reports a reroll with the new offer.</summary>
+    public static void ReportReroll(CardReward reward)
+    {
+        if (SoulLinkSession.Current is { Run: not null } session && TableId(reward) is { } table)
+        {
+            session.Submit(table, SyncActions.RewardReroll, RewardTable.OfferArgs(OfferOf(reward)));
+            SharePeeks(reward);
+        }
+    }
+
+    /// <summary>
+    /// Shares the card in each of the reward's slots, so teammates see it when they hover the same slot. Teammates'
+    /// rewards are rolled on their own machines, so this is the only way to see them.
+    /// </summary>
+    public static void SharePeeks(CardReward reward)
+    {
+        if (SoulLinkSession.Current is not { Run: not null } session || TableId(reward) is not { } table)
+        {
+            return;
+        }
+
+        var options = OptionsOf(reward);
+        var slots = new List<KeyValuePair<string, string>>();
+        for (var i = 0; i < options.Count; i++)
+        {
+            if (options[i].Card is { } card)
+            {
+                slots.Add(new(KeyOfCard(options, i).Value, PeekTips.CardValue(card)));
+            }
+        }
+
+        var args = SyncState.PeekArgs(slots);
+        var text = string.Join("\n", args);
+        if (slots.Count == 0 || (Shared.TryGetValue(table, out var sent) && sent == text))
+        {
+            return;
+        }
+
+        Shared[table] = text;
+        session.Submit(table, SyncActions.PeekSet, args);
+    }
+
+    public static CardRewardOffer OfferOf(CardReward reward)
+    {
+        var cards = 0;
+        var extras = new List<string>();
+        foreach (var option in OptionsOf(reward))
+        {
+            if (ExtraSources.TryGetValue(option, out var source))
+            {
+                extras.Add(source);
+            }
+            else
+            {
+                cards++;
+            }
+        }
+
+        return new CardRewardOffer(cards, extras, reward.CanReroll, CanSacrifice: reward.Player.Relics.OfType<PaelsWing>().Any());
+    }
+
+    public static IReadOnlyList<CardCreationResult> OptionsOf(CardReward reward) => RewardAccess.Cards(reward);
+
+    private static int ScreenNumber(RewardsSet set, CardReward reward)
+    {
+        var number = 0;
+        foreach (var item in set.Rewards)
+        {
+            if (item is CardReward)
+            {
+                number++;
+            }
+
+            if (ReferenceEquals(item, reward))
+            {
+                break;
+            }
+        }
+
+        return number;
+    }
+
+    private static string LocationOf(RewardsSet set) => set.Player.RunState.RunLocation.ToString();
+
+    private static SoulLink.Core.PlayerId Me() => SoulLinkSession.Current?.Me ?? default;
+
+    private static void Join(CardReward reward)
+    {
+        if (SoulLinkSession.Current is not { Run: not null } session)
+        {
+            return;
+        }
+
+        foreach (var op in JoinOps(reward))
+        {
+            op.Sent?.Invoke();
+            session.Submit(op.Table, op.Action, op.Args);
+        }
+
+        SharePeeks(reward);
+    }
+}

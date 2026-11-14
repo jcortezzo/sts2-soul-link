@@ -3,15 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{E266A1DD-E01B-4437-9F0A-29D46EE7B2FA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoulLink", "SoulLink.csproj", "{5330B4B6-31C4-414D-8685-0CBB915DFD09}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoulLink.Core", "src\SoulLink.Core\SoulLink.Core.csproj", "{882108F8-F5B6-4F89-B013-2D2B8E541673}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoulLink.Core", "SoulLink.Core\SoulLink.Core.csproj", "{882108F8-F5B6-4F89-B013-2D2B8E541673}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoulLink", "src\SoulLink\SoulLink.csproj", "{5330B4B6-31C4-414D-8685-0CBB915DFD09}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{67119FD9-D877-46DD-89DB-5608A9AEA514}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoulLink.Core.Tests", "tests\SoulLink.Core.Tests\SoulLink.Core.Tests.csproj", "{A5B2C9FF-32E1-4EED-8378-4A1F597301E5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SoulLink.Core.Tests", "SoulLink.Core.Tests\SoulLink.Core.Tests.csproj", "{A5B2C9FF-32E1-4EED-8378-4A1F597301E5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -22,6 +18,10 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5330B4B6-31C4-414D-8685-0CBB915DFD09}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5330B4B6-31C4-414D-8685-0CBB915DFD09}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5330B4B6-31C4-414D-8685-0CBB915DFD09}.Release|Any CPU.ActiveCfg = ExportRelease|Any CPU
+		{5330B4B6-31C4-414D-8685-0CBB915DFD09}.Release|Any CPU.Build.0 = ExportRelease|Any CPU
 		{882108F8-F5B6-4F89-B013-2D2B8E541673}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{882108F8-F5B6-4F89-B013-2D2B8E541673}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{882108F8-F5B6-4F89-B013-2D2B8E541673}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -30,14 +30,5 @@ Global
 		{A5B2C9FF-32E1-4EED-8378-4A1F597301E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A5B2C9FF-32E1-4EED-8378-4A1F597301E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A5B2C9FF-32E1-4EED-8378-4A1F597301E5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{5330B4B6-31C4-414D-8685-0CBB915DFD09}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{5330B4B6-31C4-414D-8685-0CBB915DFD09}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{5330B4B6-31C4-414D-8685-0CBB915DFD09}.Release|Any CPU.ActiveCfg = ExportRelease|Any CPU
-		{5330B4B6-31C4-414D-8685-0CBB915DFD09}.Release|Any CPU.Build.0 = ExportRelease|Any CPU
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{882108F8-F5B6-4F89-B013-2D2B8E541673} = {E266A1DD-E01B-4437-9F0A-29D46EE7B2FA}
-		{A5B2C9FF-32E1-4EED-8378-4A1F597301E5} = {67119FD9-D877-46DD-89DB-5608A9AEA514}
-		{5330B4B6-31C4-414D-8685-0CBB915DFD09} = {E266A1DD-E01B-4437-9F0A-29D46EE7B2FA}
 	EndGlobalSection
 EndGlobal
