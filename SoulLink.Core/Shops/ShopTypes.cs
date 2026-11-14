@@ -6,6 +6,9 @@ public enum ShopSlotKind
     Relic,
     Potion,
     CardRemoval,
+
+    /// <summary>One of the Blitz merchant's wares, like a card removal or a card reward, counted in shop order.</summary>
+    Ware,
 }
 
 /// <summary>
@@ -25,6 +28,9 @@ public readonly record struct ShopSlot(ShopSlotKind Kind, int Number)
 
     /// <summary>A potion slot, counted from 1.</summary>
     public static ShopSlot Potion(int number) => Numbered(ShopSlotKind.Potion, number);
+
+    /// <summary>A Blitz merchant ware, counted from 1.</summary>
+    public static ShopSlot Ware(int number) => Numbered(ShopSlotKind.Ware, number);
 
     public override string ToString() => Kind == ShopSlotKind.CardRemoval ? "card removal" : $"{Kind} {Number}";
 

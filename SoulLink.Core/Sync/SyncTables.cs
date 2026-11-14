@@ -380,7 +380,10 @@ public sealed class ShopTable : SyncTable
         (op.Action == SyncActions.ShopEnter && Shop.IsIn(op.Player))
         || (op.Action == SyncActions.ShopRemovalJoin && Shop.RemovalTarget.IsParticipant(op.Player));
 
-    /// <summary>Arguments for <see cref="SyncActions.ShopEnter"/>.</summary>
+    /// <summary>
+    /// Arguments for <see cref="SyncActions.ShopEnter"/>. At the Blitz merchant, <paramref name="gold"/> is the player's
+    /// remaining choices and every ware costs one.
+    /// </summary>
     public static IReadOnlyList<string> EnterArgs(int gold, int freePotionSlots, IEnumerable<ShopItem> items) =>
     [
         SyncArgs.Number(gold),
@@ -394,7 +397,7 @@ public sealed class ShopTable : SyncTable
     /// <summary>Arguments for <see cref="SyncActions.ShopBuy"/>.</summary>
     public static IReadOnlyList<string> SlotArgs(ShopSlot slot) => [slot.Kind.ToString(), SyncArgs.Number(slot.Number)];
 
-    /// <summary>Arguments for <see cref="SyncActions.ShopGold"/>.</summary>
+    /// <summary>Arguments for <see cref="SyncActions.ShopGold"/>: gold, or remaining choices at the Blitz merchant.</summary>
     public static IReadOnlyList<string> GoldArgs(int gold, int freePotionSlots) =>
         [SyncArgs.Number(gold), SyncArgs.Number(freePotionSlots)];
 

@@ -81,8 +81,12 @@ internal static class DeckChoices
     /// <param name="table">The linked decision's table.</param>
     /// <param name="option">The option taken.</param>
     /// <param name="sameChoice">The players who made the same choice, who will get the same screen.</param>
-    public static void Acting(string table, string option, Func<IReadOnlyList<PlayerId>> sameChoice) =>
-        _context = new ChoiceContext($"{table}|{option}", sameChoice, Time.GetTicksMsec());
+    /// <param name="binding">
+    /// Whether the screen can't be backed out of, like a shop purchase's: it was decided for everyone, so its close
+    /// button is taken away.
+    /// </param>
+    public static void Acting(string table, string option, Func<IReadOnlyList<PlayerId>> sameChoice, bool binding = false) =>
+        _context = new ChoiceContext($"{table}|{option}", sameChoice, Time.GetTicksMsec(), binding);
 
     /// <summary>Whether the mod links this screen's pick.</summary>
     public static bool IsLinked(NCardGridSelectionScreen screen) =>
@@ -122,6 +126,11 @@ internal static class DeckChoices
                 : OptionTable.JoinArgs(pickCount, Enumerable.Range(1, cards.Count).Select(slot => new DecisionOption(OptionKey.Slot(slot)))));
         _open = new OpenScreen(screen, table, fromDeck, pickCount, cards, context.SameChoice, join);
         MainFile.Logger.Info($"Soul Link linked the card screen {table}: {cards.Count} {(fromDeck ? "deck" : "offered")} card(s), pick {pickCount}.");
+        if (context.Binding)
+        {
+            MakeUncancelable(screen);
+        }
+
         session.Submit(table, join.Action, join.Args, accepted =>
             MainFile.Logger.Info($"Soul Link's card screen {table} {(accepted ? "joined" : "was refused by")} the host."));
         if (!fromDeck)
@@ -150,6 +159,7 @@ internal static class DeckChoices
         {
             MainFile.Logger.Info($"Soul Link left a pick of {picked.Count} on {open.Table} unlinked.");
             _open = null;
+            Leave(open);
             Finish(screen, picked);
             return;
         }
@@ -261,6 +271,21 @@ internal static class DeckChoices
 
         SelectionChanged(screen);
         Refresh();
+    }
+
+    /// <summary>
+    /// After the game closed the linked screen without the mod finishing it, as when the player backs out of a screen
+    /// that allows it: the player leaves the linked choice, so teammates don't wait for their pick.
+    /// </summary>
+    public static void Closed(NCardGridSelectionScreen screen)
+    {
+        if (_open is not { } open || !ReferenceEquals(open.Screen, screen))
+        {
+            return;
+        }
+
+        _open = null;
+        Leave(open);
     }
 
     /// <summary>Shows who picked which card, and dims cards the local player can't pick.</summary>
@@ -530,6 +555,34 @@ internal static class DeckChoices
         return marked;
     }
 
+    /// <summary>Takes the local player out of a linked card choice they won't pick in, unless their pick is already made.</summary>
+    private static void Leave(OpenScreen open)
+    {
+        if (OptionLinks.Session is not { } session || Decision(open)?.CommittedCards is not null)
+        {
+            return;
+        }
+
+        var leave = open.FromDeck ? SyncActions.CardsLeave : SyncActions.OptionsLeave;
+        session.Submit(open.Table, leave, [], accepted =>
+            MainFile.Logger.Info($"Soul Link {(accepted ? "left" : "couldn't leave")} the card screen {open.Table} without a linked pick."));
+    }
+
+    /// <summary>Takes away a screen's close button: a pick decided for everyone can't be backed out of.</summary>
+    private static void MakeUncancelable(NCardGridSelectionScreen screen)
+    {
+        var type = screen.GetType();
+        if (AccessTools.Field(type, "_prefs") is { } prefsField && prefsField.GetValue(screen) is CardSelectorPrefs prefs && prefs.Cancelable)
+        {
+            prefsField.SetValue(screen, prefs with { Cancelable = false });
+        }
+
+        if (AccessTools.Field(type, "_closeButton")?.GetValue(screen) is NClickableControl close && GodotObject.IsInstanceValid(close))
+        {
+            close.Disable();
+        }
+    }
+
     private static void CheckHeldLater()
     {
         if (_checkingHeld || Engine.GetMainLoop() is not SceneTree tree)
@@ -582,8 +635,11 @@ internal static class DeckChoices
         return OptionLinks.DecisionOf(open.Table) is { } slots ? new LinkedPick(slots.Participants, open, null, slots) : null;
     }
 
-    /// <summary>The linked choice that opened card screens, with the players who made the same choice.</summary>
-    private sealed record ChoiceContext(string Key, Func<IReadOnlyList<PlayerId>> SameChoice, ulong Since);
+    /// <summary>
+    /// The linked choice that opened card screens, with the players who made the same choice, and whether its screens
+    /// can't be backed out of.
+    /// </summary>
+    private sealed record ChoiceContext(string Key, Func<IReadOnlyList<PlayerId>> SameChoice, ulong Since, bool Binding);
 
     /// <summary>A pick waiting for teammates' screens to open.</summary>
     private sealed record HeldPick(IReadOnlyList<CardModel> Cards, ulong Since);

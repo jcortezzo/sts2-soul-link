@@ -5,7 +5,7 @@ namespace SoulLink.Core.Campfires;
 
 public enum CampfireCategory
 {
-    /// <summary>Rest and Mend.</summary>
+    /// <summary>Rest, Mend and Restore.</summary>
     Recover,
 
     /// <summary>Smith, Dig, Cook, Lift and any other option a relic or quest adds.</summary>
@@ -24,14 +24,20 @@ public static class CampfireOptions
     /// <summary>Rest, which the game calls HEAL.</summary>
     public const string Rest = "HEAL";
     public const string Mend = "MEND";
+
+    /// <summary>Wuppy's option: heals the Wuppy companion to full.</summary>
+    public const string Restore = "RESTORE";
     public const string Smith = "SMITH";
     public const string Dig = "DIG";
     public const string Cook = "COOK";
     public const string Lift = "LIFT";
 
-    /// <summary>Rest and Mend recover; every other option improves, including ones added by relics or quests.</summary>
+    /// <summary>
+    /// Rest, Mend and Wuppy's Restore recover, since they heal; every other option improves, including ones added by
+    /// relics or quests, like Byrdpip's Evolve.
+    /// </summary>
     public static CampfireCategory CategoryOf(string optionId) =>
-        Is(optionId, Rest) || Is(optionId, "REST") || Is(optionId, Mend) ? CampfireCategory.Recover : CampfireCategory.Improve;
+        Is(optionId, Rest) || Is(optionId, "REST") || Is(optionId, Mend) || Is(optionId, Restore) ? CampfireCategory.Recover : CampfireCategory.Improve;
 
     /// <summary>The option key of a category in <see cref="CampfireSession.Category"/>.</summary>
     public static OptionKey KeyOf(CampfireCategory category) => OptionKey.Named(category.ToString().ToLowerInvariant());

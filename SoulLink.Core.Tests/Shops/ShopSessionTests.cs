@@ -228,4 +228,52 @@ public class ShopSessionTests
         Assert.Throws<InvalidOperationException>(() => shop.Choose(Ana, ShopSlot.Relic(2)));
         Assert.Empty(shop.VotesOf(Ana));
     }
+
+    [Fact]
+    public void Blitz_wares_cost_one_of_the_players_remaining_choices()
+    {
+        // The Blitz merchant: gold doesn't matter, each player has a few choices, and every ware costs one.
+        ShopItem[] Wares() => [new(ShopSlot.Ware(1), 1), new(ShopSlot.Ware(2), 1), new(ShopSlot.Ware(3), 1)];
+        var shop = NewShop(LinkMode.Nice);
+        shop.Enter(Ana, gold: 2, freePotionSlots: 0, Wares());
+        shop.Enter(Ben, gold: 1, freePotionSlots: 0, Wares());
+
+        var first = shop.Choose(Ana, ShopSlot.Ware(2));
+
+        // Ben has to follow, which takes his only choice, so he can't choose another ware first.
+        Assert.Equal([new Obligation(Ben, ShopSlot.Ware(2), 1, Ana, 1)], first[0].NewObligations);
+        Assert.Equal(PurchaseVerdict.NotEnoughGold, shop.CanBuy(Ben, ShopSlot.Ware(1)).Verdict);
+        Assert.Equal([Ana, Ben], first.Select(purchase => purchase.Player));
+
+        // Ana still has a choice, and nobody else can follow her second ware.
+        var second = shop.Choose(Ana, ShopSlot.Ware(3));
+        Assert.Single(second);
+        Assert.Empty(second[0].NewObligations);
+        Assert.Equal(0, shop.GoldOf(Ana));
+    }
+
+    [Fact]
+    public void A_ware_that_grants_more_choices_shows_up_as_more_gold()
+    {
+        var shop = NewShop(LinkMode.Mean, WhoDecides.EveryoneAgrees);
+        shop.Enter(Ana, gold: 1, freePotionSlots: 0, [new(ShopSlot.Ware(1), 1), new(ShopSlot.Ware(2), 1)]);
+        shop.Enter(Ben, gold: 1, freePotionSlots: 0, [new(ShopSlot.Ware(1), 1), new(ShopSlot.Ware(2), 1)]);
+        shop.Choose(Ana, ShopSlot.Ware(1));
+        Assert.Equal(2, shop.Choose(Ben, ShopSlot.Ware(1)).Count);
+        Assert.Equal(PurchaseVerdict.NotEnoughGold, shop.CanBuy(Ana, ShopSlot.Ware(2)).Verdict);
+
+        // Ware 1 was Two More Choices: the game reports each player's new count back to the shop.
+        shop.SetGold(Ana, 2);
+        shop.SetGold(Ben, 2);
+
+        Assert.True(shop.CanBuy(Ana, ShopSlot.Ware(2)).IsAllowed);
+    }
+
+    [Fact]
+    public void Ware_slots_are_their_own_kind()
+    {
+        Assert.Equal(new ShopSlot(ShopSlotKind.Ware, 3), ShopSlot.Ware(3));
+        Assert.Equal("Ware 3", ShopSlot.Ware(3).ToString());
+        Assert.NotEqual(ShopSlot.Card(3), ShopSlot.Ware(3));
+    }
 }

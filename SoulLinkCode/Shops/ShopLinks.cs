@@ -1,10 +1,13 @@
 using Godot;
+using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Merchant;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Nodes.Screens.Shops;
+using MegaCrit.Sts2.Core.Runs;
 using SoulLink.Core;
 using SoulLink.Core.Shops;
 using SoulLink.Core.Sync;
@@ -15,12 +18,22 @@ using SoulLink.SoulLinkCode.Ui;
 namespace SoulLink.SoulLinkCode.Shops;
 
 /// <summary>
-/// Links shop purchases slot by slot: each card, relic and potion slot and the card removal service. A click is a vote
-/// to buy or a first-click purchase; the mod buys from the local player's own shop, at their own price, whatever the
-/// host decides they buy.
+/// Links shop purchases slot by slot: each card, relic and potion slot and the card removal service, or each of the
+/// Blitz merchant's wares. A click is a vote to buy or a first-click purchase; the mod buys from the local player's own
+/// shop, at their own price, whatever the host decides they buy.
 /// </summary>
+/// <remarks>
+/// The game keeps every player's stock in its merchant sync and makes each purchase on every peer, one purchase at a
+/// time per player, so the mod buys through it, one owed purchase after another.
+/// </remarks>
 internal static class ShopLinks
 {
+    private static readonly AccessTools.FieldRef<MerchantSynchronizer, List<MerchantInventory>> InventoriesOf =
+        AccessTools.FieldRefAccess<MerchantSynchronizer, List<MerchantInventory>>("_inventories");
+
+    private static readonly AccessTools.FieldRef<MerchantInventory, bool> PurchaseInFlight =
+        AccessTools.FieldRefAccess<MerchantInventory, bool>("_purchaseInFlight");
+
     /// <summary>Purchases done in the game, as "table|sequence", so each linked purchase is made once.</summary>
     private static readonly HashSet<string> Done = new(StringComparer.Ordinal);
 
@@ -28,6 +41,7 @@ internal static class ShopLinks
     private static int _buying;
     private static (int Gold, int PotionSlots)? _lastReported;
     private static bool _scheduled;
+    private static bool _checkingLater;
 
     /// <summary>Forgets everything from the last run.</summary>
     public static void Reset()
@@ -41,7 +55,31 @@ internal static class ShopLinks
     public static NMerchantRoom? Room() =>
         NMerchantRoom.Instance is { } room && GodotObject.IsInstanceValid(room) && room.IsInsideTree() ? room : null;
 
-    public static MerchantInventory? Inventory() => Room()?.Room?.GetLocalInventory();
+    /// <summary>The local player's stock in the shop they're in.</summary>
+    public static MerchantInventory? Inventory() => OptionLinks.Me is { } me ? InventoryOf(me) : null;
+
+    /// <summary>A player's stock in the shop the local player is in, or null outside a shop.</summary>
+    public static MerchantInventory? InventoryOf(Player player)
+    {
+        if (Room() is null || RunManager.Instance?.MerchantSynchronizer is not { } merchant)
+        {
+            return null;
+        }
+
+        var inventories = InventoriesOf(merchant);
+        var index = player.RunState.GetPlayerSlotIndex(player);
+        return inventories is not null && index >= 0 && index < inventories.Count ? inventories[index] : null;
+    }
+
+    /// <summary>
+    /// What the player can spend in their shop: gold, or at the Blitz merchant, where wares cost no gold, the choices
+    /// they have left.
+    /// </summary>
+    private static int Budget(Player player, MerchantInventory inventory) =>
+        inventory.IsBlitzShop ? Math.Max(0, inventory.BlitzChoicesRemaining) : player.Gold;
+
+    /// <summary>A slot's price against <see cref="Budget"/>: a Blitz ware uses one choice.</summary>
+    private static int PriceOf(MerchantEntry entry) => entry is BlitzMerchantEntry ? 1 : entry.Cost;
 
     public static string? TableId() => OptionLinks.Room is { } room ? $"{room}/shop" : null;
 
@@ -49,7 +87,10 @@ internal static class ShopLinks
     public static ShopSession? Shop(string table) =>
         OptionLinks.Session is { } session && session.State.Find<ShopTable>(table)?.Shop is { } shop && shop.IsIn(session.Me) ? shop : null;
 
-    /// <summary>The slot an entry sits in: cards count across the character and colorless rows, then relics, potions and removal.</summary>
+    /// <summary>
+    /// The slot an entry sits in: cards count across the character and colorless rows, then relics, potions, removal
+    /// and the Blitz merchant's wares.
+    /// </summary>
     public static ShopSlot? SlotOf(MerchantInventory inventory, MerchantEntry entry)
     {
         var cards = inventory.CharacterCardEntries.Concat(inventory.ColorlessCardEntries).ToList();
@@ -74,6 +115,14 @@ internal static class ShopLinks
             if (ReferenceEquals(inventory.PotionEntries[i], entry))
             {
                 return ShopSlot.Potion(i + 1);
+            }
+        }
+
+        for (var i = 0; i < inventory.BlitzEntries.Count; i++)
+        {
+            if (ReferenceEquals(inventory.BlitzEntries[i], entry))
+            {
+                return ShopSlot.Ware(i + 1);
             }
         }
 
@@ -103,6 +152,11 @@ internal static class ShopLinks
         {
             yield return (ShopSlot.CardRemoval, removal);
         }
+
+        for (var i = 0; i < inventory.BlitzEntries.Count; i++)
+        {
+            yield return (ShopSlot.Ware(i + 1), inventory.BlitzEntries[i]);
+        }
     }
 
     /// <summary>
@@ -112,8 +166,8 @@ internal static class ShopLinks
     public static IReadOnlyList<IHoverTip> Peek(NMerchantSlot node)
     {
         if (OptionLinks.Session is not { } session
-            || Room()?.Room is not { } room
-            || room.GetLocalInventory() is not { } mine
+            || OptionLinks.Me is not { } me
+            || Inventory() is not { } mine
             || node.Entry is not { } entry
             || SlotOf(mine, entry) is not { } slot
             || slot == ShopSlot.CardRemoval)
@@ -122,13 +176,12 @@ internal static class ShopLinks
         }
 
         var tips = new List<IHoverTip>();
-        foreach (var inventory in room.Inventories.Where(inventory => inventory.Player is not null).OrderBy(inventory => inventory.Player.NetId))
+        foreach (var teammate in me.RunState.Players.Where(player => !ReferenceEquals(player, me)).OrderBy(player => player.NetId))
         {
-            var player = OptionLinks.IdOf(inventory.Player);
-            if (player != session.Me)
+            if (InventoryOf(teammate) is { } inventory)
             {
                 var theirs = Slots(inventory).Where(item => item.Slot == slot).Select(item => item.Entry).FirstOrDefault();
-                tips.AddRange(Peek(player, theirs, entry));
+                tips.AddRange(Peek(OptionLinks.IdOf(teammate), theirs, entry));
             }
         }
 
@@ -140,6 +193,12 @@ internal static class ShopLinks
         if (theirs is null)
         {
             return [PeekTips.About(player, "Has nothing in this slot.")];
+        }
+
+        if (theirs is BlitzMerchantEntry ware)
+        {
+            var used = ware.IsStocked ? null : "\nThey can't choose it any more.";
+            return [PeekTips.About(player, (PeekTips.Text(ware.Description) ?? "") + used, PeekTips.Text(ware.Title), ware.SmallIcon)];
         }
 
         if (!theirs.IsStocked)
@@ -173,14 +232,15 @@ internal static class ShopLinks
             return [];
         }
 
-        var items = Slots(inventory).Select(slot => new ShopItem(slot.Slot, slot.Entry.Cost, slot.Entry.IsStocked)).ToList();
-        var args = ShopTable.EnterArgs(me.Gold, FreePotionSlots(me), items);
+        var items = Slots(inventory).Select(slot => new ShopItem(slot.Slot, PriceOf(slot.Entry), slot.Entry.IsStocked)).ToList();
+        var budget = Budget(me, inventory);
+        var args = ShopTable.EnterArgs(budget, FreePotionSlots(me), items);
         if (session.HasJoined(table, SyncActions.ShopEnter, args))
         {
             return [];
         }
 
-        var reported = (me.Gold, FreePotionSlots(me));
+        var reported = (budget, FreePotionSlots(me));
         return [new GatedOp(table, SyncActions.ShopEnter, args, Sent: () =>
         {
             Entered.Add(table);
@@ -205,6 +265,13 @@ internal static class ShopLinks
         {
             if (Undone(shop, table, session.Me).FirstOrDefault(purchase => purchase.Slot == slot) is { } owed)
             {
+                // The game makes one purchase at a time, so while one is under way the owed purchase waits its turn.
+                if (_buying > 0 || PurchaseInFlight(inventory))
+                {
+                    Schedule();
+                    return false;
+                }
+
                 Done.Add($"{table}|{owed.Sequence}");
                 MarkSource(table, owed);
                 return true;
@@ -272,15 +339,19 @@ internal static class ShopLinks
 
     /// <summary>
     /// Marks a purchase as the source of what follows: a card bought links with the cards the others bought from the
-    /// same slot, and card removal's card screen links with the screens of everyone who bought removal.
+    /// same slot, and a card screen the purchase opens, like card removal's or a Blitz ware's, links with the screens of
+    /// everyone who bought that slot and can't be backed out of.
     /// </summary>
     private static void MarkSource(string table, Purchase purchase)
     {
         CardLinksSync.GainingFrom(table, purchase.Slot.ToString(), purchase.Root);
-        DeckChoices.Acting(table, purchase.Slot.ToString(), () =>
-            Shop(table) is { } shop
+        DeckChoices.Acting(
+            table,
+            purchase.Slot.ToString(),
+            () => Shop(table) is { } shop
                 ? shop.Purchases.Where(other => other.Slot == purchase.Slot).Select(other => other.Player).Distinct().ToList()
-                : []);
+                : [],
+            binding: true);
     }
 
 
@@ -312,7 +383,10 @@ internal static class ShopLinks
         }
     }
 
-    /// <summary>Makes the purchases the host decided for the local player, then reports their gold back.</summary>
+    /// <summary>
+    /// Makes the purchases the host decided for the local player, one at a time and oldest first, then reports their
+    /// gold or remaining choices back.
+    /// </summary>
     private static void Pump()
     {
         if (OptionLinks.Session is not { } session || TableId() is not { } table || Shop(table) is not { } shop
@@ -321,24 +395,34 @@ internal static class ShopLinks
             return;
         }
 
-        foreach (var purchase in Undone(shop, table, session.Me).ToList())
+        // The game makes one purchase at a time, including one the player started themselves.
+        if (_buying == 0 && PurchaseInFlight(inventory) && Undone(shop, table, session.Me).Any())
         {
-            Done.Add($"{table}|{purchase.Sequence}");
-            var entry = Slots(inventory).FirstOrDefault(slot => slot.Slot == purchase.Slot).Entry;
-            if (entry is null)
+            CheckLater();
+        }
+        else if (_buying == 0)
+        {
+            foreach (var purchase in Undone(shop, table, session.Me).ToList())
             {
-                MainFile.Logger.Warn($"Soul Link couldn't find {purchase.Slot} in your shop.");
-                continue;
-            }
+                Done.Add($"{table}|{purchase.Sequence}");
+                var entry = Slots(inventory).FirstOrDefault(slot => slot.Slot == purchase.Slot).Entry;
+                if (entry is null)
+                {
+                    MainFile.Logger.Warn($"Soul Link couldn't find {purchase.Slot} in your shop.");
+                    continue;
+                }
 
-            MainFile.Logger.Info($"Soul Link is buying {purchase.Slot}.");
-            MarkSource(table, purchase);
-            _buying++;
-            TaskHelper.RunSafely(Buy(entry, inventory));
+                MainFile.Logger.Info($"Soul Link is buying {purchase.Slot}.");
+                MarkSource(table, purchase);
+                _buying++;
+                TaskHelper.RunSafely(Buy(entry));
+                break;
+            }
         }
 
-        // Gold changes the game makes, like a purchase's real price, go back to the shop once nothing is being bought.
-        if (_buying == 0 && (me.Gold, FreePotionSlots(me)) is var now && now != _lastReported
+        // Changes the game makes, like a purchase's real price or a ware that gives more choices, go back to the shop
+        // once nothing is being bought.
+        if (_buying == 0 && (Budget(me, inventory), FreePotionSlots(me)) is var now && now != _lastReported
             && (shop.GoldOf(session.Me) != now.Item1 || shop.FreePotionSlotsOf(session.Me) != now.Item2))
         {
             _lastReported = now;
@@ -346,15 +430,24 @@ internal static class ShopLinks
         }
     }
 
-    private static async Task Buy(MerchantEntry entry, MerchantInventory inventory)
+    /// <summary>Buys through the game's merchant sync, so every peer makes the same purchase.</summary>
+    private static async Task Buy(MerchantEntry entry)
     {
         try
         {
+            if (RunManager.Instance?.MerchantSynchronizer is not { } merchant)
+            {
+                MainFile.Logger.Warn("Soul Link couldn't reach the shop to make a linked purchase.");
+                return;
+            }
+
             // A linked card removal can't be backed out of: it was decided for everyone.
-            var bought = entry is MerchantCardRemovalEntry removal
-                ? await removal.OnTryPurchaseWrapper(inventory, cancelable: false)
-                : await entry.OnTryPurchaseWrapper(inventory);
-            if (!bought)
+            if (entry is MerchantCardRemovalEntry removal)
+            {
+                removal.SetPurchaseUncancelable();
+            }
+
+            if (!await merchant.PurchaseLocalEntry(entry))
             {
                 MainFile.Logger.Warn("Soul Link couldn't make a linked purchase in your shop.");
             }
@@ -364,5 +457,21 @@ internal static class ShopLinks
             _buying--;
             Schedule();
         }
+    }
+
+    /// <summary>Looks again shortly, while a purchase the player started is still under way.</summary>
+    private static void CheckLater()
+    {
+        if (_checkingLater || Engine.GetMainLoop() is not SceneTree tree)
+        {
+            return;
+        }
+
+        _checkingLater = true;
+        tree.CreateTimer(0.25).Timeout += () =>
+        {
+            _checkingLater = false;
+            Schedule();
+        };
     }
 }

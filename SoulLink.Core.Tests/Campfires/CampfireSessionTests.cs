@@ -137,6 +137,8 @@ public class CampfireSessionTests
     [InlineData("HEAL", CampfireCategory.Recover)]
     [InlineData("REST", CampfireCategory.Recover)]
     [InlineData("mend", CampfireCategory.Recover)]
+    [InlineData("RESTORE", CampfireCategory.Recover)]
+    [InlineData("EVOLVE", CampfireCategory.Improve)]
     [InlineData("DIG", CampfireCategory.Improve)]
     [InlineData("CLONE", CampfireCategory.Improve)]
     [InlineData("SMITH", CampfireCategory.Improve)]

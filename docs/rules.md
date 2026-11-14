@@ -7,7 +7,7 @@ This is the rules spec the mod implements, kept in the repo so the code and the 
 In a co-op run, every out-of-combat decision is linked: everyone who can make the same choice makes it together. By default a choice is made once everyone who can make it has clicked it; a setting lets the first click decide for everyone instead. Combat, potions and the map stay free.
 
 - **Players:** 2 to 4, all running the mod.
-- **Linked:** card rewards, deck card choices (upgrade, remove, transform, enchant, duplicate), shop purchases, campfires, events, Ancients and relic rewards.
+- **Linked:** card rewards, deck card choices (upgrade, remove, transform, enchant, duplicate), shop purchases (the Blitz merchant's wares too), campfires, events, Ancients (Blitz's starting cards too) and relic rewards. Blitz and Dread runs are linked the same way.
 - **Settings** decide how strict it is: how cards are matched, what happens when someone can't follow (nice or mean), whether everyone has to agree, and whether one death ends the run.
 - **Origin:** our own rules, plus the campfire categories and linked cards from the [Slay the Soul-Link](https://docs.google.com/document/d/1XyDEOh4QqVfNqKOosRGrHEikjtB77w95TzjEURAe4lY/edit?tab=t.0) challenge by Rayditz and naturesbf, extended to 4 players and enforced by the mod.
 
@@ -82,7 +82,7 @@ When several players choose a card from their deck for the same action, the firs
 
 The players in the action are the ones doing that same action at that moment: everyone who Smiths at a campfire, everyone who bought card removal, everyone who took the same event option. For multi-card picks (choose 2), the whole set must match.
 
-You pick on the game's own card screen as usual. With everyone agrees, confirming your pick is your vote: you're taken back to the cards, with your portrait on the one you picked and your teammates' portraits on theirs, and the screen stays open until everyone's picks agree, so you can still change it. With first click, the first confirmed pick decides.
+You pick on the game's own card screen as usual. With everyone agrees, confirming your pick is your vote: you're taken back to the cards, with your portrait on the one you picked and your teammates' portraits on theirs, and the screen stays open until everyone's picks agree, so you can still change it. With first click, the first confirmed pick decides. If you back out of a screen that lets you, like Smith's, you leave the linked pick, so nobody waits for you.
 
 On screens where you pick several cards, like Yummy Cookie's four upgrades, your teammates see each card as you select it, before you confirm: a faded portrait means selected, a solid one confirmed. Confirming or cancelling the preview keeps your selection on the screen. Click a selected card to unselect it; that takes back your confirm, so the pick only goes through once everyone has confirmed matching cards again. Once you've selected the full number, unselect one before selecting another. Confirming waits a few seconds for teammates whose screens haven't opened yet. A teammate whose screen opens after a pick was made follows it: with first click their matching card is picked for them, and with everyone agrees their matching card is the one they can confirm. Cards offered on the spot rather than from your deck, like Room Full of Cheese's commons, match by slot instead.
 
@@ -117,9 +117,17 @@ Each shop slot is its own linked decision: every card, relic and potion, plus th
 - **Everyone agrees:** a slot is bought once everyone who can buy it has clicked it, for all of them at once. You can click several slots; a click you can no longer pay for is dropped, and clicks nobody agreed to end when the party leaves.
 - **First click:** buying a slot buys it at once for everyone else who can.
 - **Can't buy** means not enough gold, sold out, no free potion slot, or removal already used in this shop. Slots you can't buy are dimmed.
-- **Card removal:** the removal buyers' chosen cards are a linked deck card action (see Deck card actions).
+- **Card removal:** the removal buyers' chosen cards are a linked deck card action (see Deck card actions). A linked purchase's card screen can't be backed out of, since the purchase was decided for everyone.
 - **Not buying** binds no one: nobody has to buy something because someone else didn't.
 - **Potions** bought here follow these rules, even though potions are otherwise free.
+
+### Blitz merchant
+
+Blitz mode's merchant sells wares instead of cards, relics and potions: services like card removal, transform, upgrade and enchant, card and relic rewards, potions, and cursed wares. Gold doesn't matter there, but each visit only allows a few choices.
+
+- **Each ware slot is its own linked decision**, counted in the order the shop shows them. Everyone's wares are rolled separately, so you take whatever ware sits in that slot in your own shop.
+- **Choices work like gold:** a ware uses one of your choices, a ware you owe sets one aside, and with no choices left you can't follow. Two More Choices gives them back as usual.
+- **What a ware opens is linked too:** a card screen (removal, transform, upgrade, enchant) is a linked deck card action among everyone who took that slot, and it can't be backed out of. Card, relic and potion rewards it offers are linked like any rewards screen.
 
 ## Campfires
 
@@ -127,8 +135,8 @@ The category is linked, and everyone picks their own option within it. With ever
 
 | Category | Options |
 | --- | --- |
-| Recover | Rest, Mend |
-| Improve | Smith, Dig, Cook, Lift, and any other option a relic or quest adds (proposed) |
+| Recover | Rest, Mend, Restore (Wuppy) |
+| Improve | Smith, Dig, Cook, Lift, Evolve (Byrdpip), and any other option a relic or quest adds (proposed) |
 
 - **Within a category** you choose freely, and Mend's target is your choice.
 - **Smith targets:** if more than one player Smiths, the target is a linked deck card action among the players who chose Smith (see Deck card actions).
@@ -146,6 +154,7 @@ Everyone takes the same option slot, counted in the order each player sees the o
 - **Multi-pick screens** like Room Full of Cheese (choose 2 of 8 commons): everyone picks the same set of slots.
 - **Card choices inside an event** (remove, transform, upgrade) follow Deck card actions.
 - **Ancients:** same slot.
+- **Blitz start:** instead of Neow's blessings, everyone picks 3 of 10 cards offered on the spot. The picks match by slot, like any other offered cards, with selections shown live as on other screens where you pick several cards.
 - **Relic rewards after fights:** taking or skipping is linked. Leaving the rewards screen skips any relic reward you didn't take, as it does for card rewards.
 
 ## Not linked

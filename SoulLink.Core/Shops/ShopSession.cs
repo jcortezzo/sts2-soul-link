@@ -17,6 +17,11 @@ namespace SoulLink.Core.Shops;
 /// </para>
 /// <para>Not buying isn't a decision, so it binds no one.</para>
 /// <para>
+/// The Blitz merchant sells wares for no gold, but each visit allows only a few choices. The mod enters a player's
+/// remaining choices as their gold and every ware at a price of one, so the same rules apply: an owed ware sets a
+/// choice aside, and a player with no choices left can't buy.
+/// </para>
+/// <para>
 /// Players act through <see cref="Choose"/>. With first click, a click buys the slot and pays what everyone else now
 /// owes at once. With everyone agrees, a click is a vote, and the slot is bought once everyone who can buy it has
 /// voted for it.

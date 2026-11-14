@@ -65,6 +65,17 @@ internal static class CardScreenPatches
     [HarmonyPatch(typeof(NOverlayStack), nameof(NOverlayStack.Remove))]
     [HarmonyPrefix]
     private static bool KeepLinkedScreenOpen(IOverlayScreen screen) => !ReferenceEquals(screen, DeckChoices.KeepOpen);
+
+    /// <summary>A linked screen the game closed without a linked pick, like a cancelled one, leaves its choice.</summary>
+    [HarmonyPatch(typeof(NOverlayStack), nameof(NOverlayStack.Remove))]
+    [HarmonyPostfix]
+    private static void LeaveClosedScreen(IOverlayScreen screen)
+    {
+        if (screen is NCardGridSelectionScreen cards && !ReferenceEquals(screen, DeckChoices.KeepOpen))
+        {
+            Guard.Run("leave a closed card screen", () => DeckChoices.Closed(cards));
+        }
+    }
 }
 
 /// <summary>

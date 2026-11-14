@@ -588,4 +588,20 @@ public class SyncTests
         Assert.Equal([Ana], network.Agreed(state => state.Find<OptionTable>(offered)!.Decision.MarkersFor(Ben, Slot(4)).ToList()));
         Assert.False(network.Send(offered, Ana, SyncActions.OptionsMark, Slot(5).Value).IsAccepted);
     }
+
+    [Fact]
+    public void Blitz_wares_sync_like_any_other_slot()
+    {
+        var network = new SyncTestNetwork();
+        const string merchant = "f3/shop";
+        ShopItem[] wares = [new(ShopSlot.Ware(1), 1), new(ShopSlot.Ware(2), 1), new(ShopSlot.Ware(3), 1)];
+        network.Send(merchant, Ana, SyncActions.ShopEnter, ShopTable.EnterArgs(3, 2, wares));
+        network.Send(merchant, Ben, SyncActions.ShopEnter, ShopTable.EnterArgs(3, 2, wares));
+
+        network.Send(merchant, Ana, SyncActions.ShopBuy, ShopTable.SlotArgs(ShopSlot.Ware(2)));
+        Assert.True(network.Send(merchant, Ben, SyncActions.ShopBuy, ShopTable.SlotArgs(ShopSlot.Ware(2))).IsAccepted);
+
+        Assert.True(network.Agreed(state => state.Find<ShopTable>(merchant)!.Shop.HasBought(Ana, ShopSlot.Ware(2))));
+        Assert.Equal(2, network.Agreed(state => state.Find<ShopTable>(merchant)!.Shop.GoldOf(Ben)));
+    }
 }
